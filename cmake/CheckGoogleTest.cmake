@@ -19,6 +19,7 @@ else()
     FetchContent_Declare(googletest
             URL      https://github.com/google/googletest/archive/refs/tags/release-1.12.1.zip
             URL_HASH MD5=2648D4138129812611CF6B6B4B497A3B
+            DOWNLOAD_EXTRACT_TIMESTAMP true
             )
     # For Windows: Prevent overriding the parent project's compiler/linker settings
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)

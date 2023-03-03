@@ -1,0 +1,68 @@
+name: build-and-test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
+
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-ubuntu:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        compiler: [ g++-10, g++-11, g++-12, clang++-12, clang++-13, clang++-14 ]
+
+    name: Build and Test on Ubuntu
+    runs-on: ${{matrix.os}}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure CMake
+        run: cmake -S "${{github.workspace}}" -B "${{github.workspace}}/build" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_CXX_COMPILER=${{matrix.compiler}} -DRUST_ENUM_ENABLE_TESTING=ON -DRUST_ENUM_RUN_CLANG_FORMAT=OFF -DRUST_ENUM_ENABLE_HEAVY_TESTING=ON
+      - name: Build
+        run: cmake --build "${{github.workspace}}/build" --config $BUILD_TYPE
+      - name: Test
+        working-directory: ${{github.workspace}}/build
+        run: ctest -C $BUILD_TYPE --output-on-failure
+
+  build-macos:
+    name: Build and Test on MacOS
+    strategy:
+      matrix:
+        os: [ macos-latest ]
+    runs-on: ${{matrix.os}}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure CMake
+        run: cmake -S "${{github.workspace}}" -B "${{github.workspace}}/build" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DRUST_ENUM_ENABLE_TESTING=ON -DRUST_ENUM_RUN_CLANG_FORMAT=OFF -DRUST_ENUM_ENABLE_HEAVY_TESTING=ON
+      - name: Show compile commands
+        run: cat build/compile_commands.json
+      - name: Build
+        run: cmake --build "${{github.workspace}}/build" --config $BUILD_TYPE
+      - name: Test
+        working-directory: ${{github.workspace}}/build
+        shell: bash
+        run: ctest -C $BUILD_TYPE --output-on-failure
+
+  build-windows:
+    name: Build and Test on Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure CMake
+        run: cmake -S "${{github.workspace}}" -B "${{github.workspace}}/build" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DRUST_ENUM_ENABLE_TESTING=ON -DRUST_ENUM_RUN_CLANG_FORMAT=OFF -DRUST_ENUM_ENABLE_HEAVY_TESTING=OFF
+      - name: Build
+        run: cmake --build "${{github.workspace}}/build" --config $BUILD_TYPE
+      - name: Test
+        working-directory: ${{github.workspace}}/build
+        run: ctest -C $BUILD_TYPE --output-on-failure

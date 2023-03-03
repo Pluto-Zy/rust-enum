@@ -16,6 +16,4 @@ function (rust_enum_add_unittest name)
     gtest_discover_tests(${name})
 endfunction(rust_enum_add_unittest)
 
-rust_enum_add_unittest(dummy_test
-        SOURCES dummy_test.cpp
-        LIBS ${CMAKE_PROJECT_NAME}::rust_enum)
+add_subdirectory(variant)
