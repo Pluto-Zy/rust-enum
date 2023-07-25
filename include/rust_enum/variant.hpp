@@ -132,6 +132,220 @@ struct variant_valueless_strategy {
       variant_valueless_strategy_t::LET_VARIANT_DECIDE;
 };
 
+template <class Ty>
+struct traits {
+  template <class... Args>
+  using is_constructible = std::is_constructible<Ty, Args...>;
+
+  template <class... Args>
+  using is_trivially_constructible =
+      std::is_trivially_constructible<Ty, Args...>;
+
+  template <class... Args>
+  using is_nothrow_constructible = std::is_nothrow_constructible<Ty, Args...>;
+
+  using is_default_constructible = std::is_default_constructible<Ty>;
+  using is_trivially_default_constructible =
+      std::is_trivially_default_constructible<Ty>;
+  using is_nothrow_default_constructible =
+      std::is_nothrow_default_constructible<Ty>;
+
+  using is_copy_constructible = std::is_copy_constructible<Ty>;
+  using is_trivially_copy_constructible =
+      std::is_trivially_copy_constructible<Ty>;
+  using is_nothrow_copy_constructible = std::is_nothrow_copy_constructible<Ty>;
+
+  using is_move_constructible = std::is_move_constructible<Ty>;
+  using is_trivially_move_constructible =
+      std::is_trivially_move_constructible<Ty>;
+  using is_nothrow_move_constructible = std::is_nothrow_move_constructible<Ty>;
+
+  template <class Arg>
+  using is_assignable = std::is_assignable<Ty&, Arg>;
+
+  template <class Arg>
+  using is_trivially_assignable = std::is_trivially_assignable<Ty&, Arg>;
+
+  template <class Arg>
+  using is_nothrow_assignable = std::is_nothrow_assignable<Ty&, Arg>;
+
+  using is_copy_assignable = std::is_copy_assignable<Ty>;
+  using is_trivially_copy_assignable = std::is_trivially_copy_assignable<Ty>;
+  using is_nothrow_copy_assignable = std::is_nothrow_copy_assignable<Ty>;
+
+  using is_move_assignable = std::is_move_assignable<Ty>;
+  using is_trivially_move_assignable = std::is_trivially_move_assignable<Ty>;
+  using is_nothrow_move_assignable = std::is_nothrow_move_assignable<Ty>;
+
+  using is_destructible = std::is_destructible<Ty>;
+  using is_trivially_destructible = std::is_trivially_destructible<Ty>;
+  using is_nothrow_destructible = std::is_nothrow_destructible<Ty>;
+
+  using is_swappable = std::is_swappable<Ty>;
+  using is_nothrow_swappable = std::is_nothrow_swappable<Ty>;
+};
+
+#ifdef USE_CXX20
+using std::remove_cvref;
+#else
+// Implementation of C++20 std::remove_cvref
+template <class Ty>
+struct remove_cvref : std::remove_cv<typename std::remove_reference<Ty>::type> {
+};
+#endif
+
+template <class Ty>
+class variant_alternative_storage : public traits<Ty> {
+  using self = variant_alternative_storage;
+  typename std::remove_const<Ty>::type value;
+
+public:
+  using value_type = Ty;
+
+  template <class Self = self,
+            typename std::enable_if<Self::is_default_constructible::value,
+                                    int>::type = 0>
+  CONSTEXPR17 variant_alternative_storage() noexcept(
+      self::is_nothrow_default_constructible::value) :
+      value() { }
+
+  template <
+      class First, class... Last,
+      typename std::enable_if<
+          std::conjunction<
+              std::negation<std::is_same<typename remove_cvref<First>::type,
+                                         variant_alternative_storage>>,
+              typename self::template is_constructible<First, Last...>>::value,
+          int>::type = 0>
+  CONSTEXPR17 explicit variant_alternative_storage(First&& first,
+                                                   Last&&... last) noexcept(  //
+      self::template is_nothrow_constructible<First, Last...>::value) :
+      value(std::forward<First>(first), std::forward<Last>(last)...) { }
+
+  template <class Arg,
+            typename std::enable_if<
+                std::conjunction<
+                    std::negation<std::is_same<typename remove_cvref<Arg>::type,
+                                               variant_alternative_storage>>,
+                    typename self::template is_assignable<Arg>>::value,
+                int>::type = 0>
+  CONSTEXPR17 variant_alternative_storage&
+  operator=(Arg&& arg) noexcept(std::is_nothrow_assignable<Ty&, Arg>::value) {
+    value = std::forward<Arg>(arg);
+    return *this;
+  }
+
+  CONSTEXPR17 void swap(variant_alternative_storage& other) {
+    using std::swap;
+    swap(value, other.value);
+  }
+
+  CONSTEXPR17 Ty& forward_value() & noexcept { return value; }
+
+  CONSTEXPR17 Ty const& forward_value() const& noexcept { return value; }
+
+  CONSTEXPR17 Ty&& forward_value() && noexcept { return std::move(value); }
+
+  CONSTEXPR17 Ty const&& forward_value() const&& noexcept {
+    return std::move(value);
+  }
+};
+
+template <class Ty>
+struct is_reference_constructible_impl {
+  static void imaginary_function(Ty&) noexcept;
+  static void imaginary_function(Ty&&) = delete;
+};
+
+template <class Ty, class Arg, class = void>
+struct is_reference_constructible : std::false_type { };
+
+template <class Ty, class Arg>
+struct is_reference_constructible<
+    Ty, Arg,
+    decltype(is_reference_constructible_impl<Ty>::imaginary_function(
+        std::declval<Arg>()))> : std::true_type { };
+
+template <class Ty, class Arg, class = void>
+struct is_nothrow_reference_constructible : std::false_type { };
+
+template <class Ty, class Arg>
+struct is_nothrow_reference_constructible<
+    Ty, Arg,
+    decltype(is_reference_constructible_impl<Ty>::imaginary_function(
+        std::declval<Arg>()))>
+    : std::bool_constant<noexcept(
+          is_reference_constructible_impl<Ty>::imaginary_function(
+              std::declval<Arg>()))> { };
+
+template <class Ty>
+class variant_alternative_storage<Ty&> : public traits<Ty*> {
+  Ty* value;
+
+public:
+  using value_type = Ty&;
+
+  // rewrite some traits in the base class
+  template <class... Args>
+  using is_constructible =
+      std::conjunction<std::bool_constant<sizeof...(Args) == 1>,
+                       is_reference_constructible<Ty, Args...>>;
+
+  template <class... Args>
+  using is_trivially_constructible =
+      std::conjunction<is_constructible<Args...>,
+                       std::is_trivially_constructible<Ty&, Args...>>;
+
+  template <class... Args>
+  using is_nothrow_constructible =
+      std::conjunction<is_constructible<Args...>,
+                       std::is_nothrow_constructible<Ty, Args...>>;
+
+  using is_default_constructible = std::false_type;
+  using is_trivially_default_constructible = std::false_type;
+  using is_nothrow_default_constructible = std::false_type;
+
+  template <class Arg>
+  using is_assignable = is_constructible<Arg>;
+
+  template <class Arg>
+  using is_trivially_assignable = is_trivially_constructible<Arg>;
+
+  template <class Arg>
+  using is_nothrow_assignable = is_nothrow_constructible<Arg>;
+
+  template <class Arg,
+            typename std::enable_if<
+                std::conjunction<
+                    std::negation<std::is_same<typename remove_cvref<Arg>::type,
+                                               variant_alternative_storage>>,
+                    is_constructible<Arg>>::value,
+                int>::type = 0>
+  CONSTEXPR17 explicit variant_alternative_storage(Arg&& arg) noexcept(
+      is_nothrow_constructible<Arg>::value) :
+      value(std::addressof(static_cast<Ty&>(std::forward<Arg>(arg)))) { }
+
+  template <class Arg,
+            typename std::enable_if<
+                std::conjunction<
+                    std::negation<std::is_same<typename remove_cvref<Arg>::type,
+                                               variant_alternative_storage>>,
+                    is_assignable<Arg>>::value,
+                int>::type = 0>
+  CONSTEXPR17 variant_alternative_storage&
+  operator=(Arg&& arg) noexcept(is_nothrow_assignable<Arg>::value) {
+    value = std::addressof(static_cast<Ty&>(std::forward<Arg>(arg)));
+    return *this;
+  }
+
+  CONSTEXPR17 void swap(variant_alternative_storage& other) {
+    using std::swap;
+    swap(value, other.value);
+  }
+
+  CONSTEXPR17 Ty& forward_value() const noexcept { return *value; }
+};
+
 // Checks whether a variant must not contain valueless state.
 template <class Variant, variant_valueless_strategy_t strategy =
                              variant_valueless_strategy<Variant>::value>
@@ -144,7 +358,8 @@ struct variant_no_valueless_state<variant<Tys...>, strategy>
                              variant_valueless_strategy_t::DISALLOW_VALUELESS>,
           std::bool_constant<strategy ==
                              variant_valueless_strategy_t::FALLBACK>,
-          std::conjunction<std::is_nothrow_move_constructible<Tys>...>> { };
+          std::conjunction<typename variant_alternative_storage<
+              Tys>::is_nothrow_move_constructible...>> { };
 
 // std::construct_at() is constexpr in C++20
 #ifdef USE_CXX20
@@ -163,16 +378,17 @@ void destroy_at(Ty* location) noexcept {
 }
 #endif  // USE_CXX20
 
-template <bool IsTriviallyDestructible, class... Tys>
+template <bool IsTriviallyDestructible, class... AltStorages>
 union variant_destructible_uninitialized_union {
   /* For empty Tys. */
 };
 
-template <class... Tys>
+template <class... AltStorages>
 using variant_destructible_uninitialized_union_t =
     variant_destructible_uninitialized_union<
-        std::conjunction<std::is_trivially_destructible<Tys>...>::value,
-        Tys...>;
+        std::conjunction<
+            typename AltStorages::is_trivially_destructible...>::value,
+        AltStorages...>;
 
 // clang-format off
 #define DESTRUCTIBLE_UNINITIALIZED_UNION_TEMPLATE(is_trivially_destructible,   \
@@ -190,7 +406,7 @@ using variant_destructible_uninitialized_union_t =
      * inactive. (Although its destructor doesn't do anything.)                \
      */                                                                        \
     unsigned char _dummy;                                                      \
-    typename std::remove_const<Head>::type value;                              \
+    Head value;                                                                \
     variant_destructible_uninitialized_union_t<Tail...> tail;                  \
                                                                                \
     CONSTEXPR17 variant_destructible_uninitialized_union() noexcept :          \
@@ -208,7 +424,7 @@ using variant_destructible_uninitialized_union_t =
     template <class... Args>                                                   \
     CONSTEXPR17 explicit variant_destructible_uninitialized_union(             \
         std::in_place_index_t<0>, Args&&... args) noexcept(                    \
-            std::is_nothrow_constructible<Head, Args&&...>::value) :           \
+            Head::template is_nothrow_constructible<Args&&...>::value) :       \
         value(std::forward<Args>(args)...) { }                                 \
                                                                                \
     /* Defaulted copy/move constructor/assignment will be constexpr/noexcept   \
@@ -258,23 +474,23 @@ struct variant_index
               StatusCount <= (std::numeric_limits<std::uint16_t>::max)(),
               std::uint16_t, std::uint32_t>::type> { };
 
-template <class... Tys>
+template <class... AltStorages>
 struct variant_storage {
-  using storage_t = variant_destructible_uninitialized_union_t<Tys...>;
+  using storage_t = variant_destructible_uninitialized_union_t<AltStorages...>;
   storage_t _value_storage;
 
-  static constexpr bool no_valueless_state =
-      variant_no_valueless_state<variant<Tys...>>::value;
+  static constexpr bool no_valueless_state = variant_no_valueless_state<
+      variant<typename AltStorages::value_type...>>::value;
   // If the current variant will not be valueless, no storage is required for
   // it.
   // FIXME: Since the template parameter of variant may be modified in the
   //  future, we must manually construct the variant type here.
   static constexpr std::size_t status_count =
-      no_valueless_state ? sizeof...(Tys) : sizeof...(Tys) + 1;
+      no_valueless_state ? sizeof...(AltStorages) : sizeof...(AltStorages) + 1;
   using variant_index_t = typename variant_index<status_count>::type;
   variant_index_t _raw_index;
   // cannot use variant_index_t, which may cause overflow
-  static constexpr std::size_t valueless_raw_index = sizeof...(Tys);
+  static constexpr std::size_t valueless_raw_index = sizeof...(AltStorages);
 
   CONSTEXPR17 variant_storage() : _value_storage(), _raw_index(0) { }
 
@@ -368,32 +584,36 @@ struct variant_storage {
 template <std::size_t Idx, class Union>
 struct variant_element_helper;
 
-template <std::size_t Idx, class... Tys>
+template <std::size_t Idx, class... AltStorages>
 struct variant_element_helper<
-    Idx, variant_destructible_uninitialized_union_t<Tys...>&> {
-  using raw_type = variant_alternative_t<Idx, variant<Tys...>>;
-  using reference_type = raw_type&;
+    Idx, variant_destructible_uninitialized_union_t<AltStorages...>&> {
+  using raw_type =
+      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
+  using reference_type = variant_alternative_storage<raw_type>&;
 };
 
-template <std::size_t Idx, class... Tys>
+template <std::size_t Idx, class... AltStorages>
 struct variant_element_helper<
-    Idx, variant_destructible_uninitialized_union_t<Tys...> const&> {
-  using raw_type = variant_alternative_t<Idx, const variant<Tys...>>;
-  using reference_type = raw_type&;
+    Idx, variant_destructible_uninitialized_union_t<AltStorages...> const&> {
+  using raw_type =
+      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
+  using reference_type = variant_alternative_storage<raw_type> const&;
 };
 
-template <std::size_t Idx, class... Tys>
+template <std::size_t Idx, class... AltStorages>
 struct variant_element_helper<
-    Idx, variant_destructible_uninitialized_union_t<Tys...>&&> {
-  using raw_type = variant_alternative_t<Idx, variant<Tys...>>;
-  using reference_type = raw_type&&;
+    Idx, variant_destructible_uninitialized_union_t<AltStorages...>&&> {
+  using raw_type =
+      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
+  using reference_type = variant_alternative_storage<raw_type>&&;
 };
 
-template <std::size_t Idx, class... Tys>
+template <std::size_t Idx, class... AltStorages>
 struct variant_element_helper<
-    Idx, variant_destructible_uninitialized_union_t<Tys...> const&&> {
-  using raw_type = variant_alternative_t<Idx, const variant<Tys...>>;
-  using reference_type = raw_type&&;
+    Idx, variant_destructible_uninitialized_union_t<AltStorages...> const&&> {
+  using raw_type =
+      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
+  using reference_type = variant_alternative_storage<raw_type> const&&;
 };
 
 template <class>
@@ -411,15 +631,6 @@ struct is_specialization_of_variant_storage : std::false_type { };
 template <class... Tys>
 struct is_specialization_of_variant_storage<variant_storage<Tys...>>
     : std::true_type { };
-
-#ifdef USE_CXX20
-using std::remove_cvref;
-#else
-// Implementation of C++20 std::remove_cvref
-template <class Ty>
-struct remove_cvref : std::remove_cv<typename std::remove_reference<Ty>::type> {
-};
-#endif
 
 /// This function is used to get the pointer to the Idx-th member of the
 /// variant. It is functionally equivalent to the following implementation:
@@ -581,13 +792,15 @@ struct variant_visit_dispatcher<std::index_sequence<Is...>> {
       return static_cast<void>(std::invoke(
           std::forward<Fn>(func),
           get_variant_tagged_content<Is>(std::forward<Storages>(storages))
-              .forward_content()...));
+              .forward_content()
+              .forward_value()...));
     } else {
       // Implicit conversion.
       return std::invoke(
           std::forward<Fn>(func),
           get_variant_tagged_content<Is>(std::forward<Storages>(storages))
-              .forward_content()...);
+              .forward_content()
+              .forward_value()...);
     }
   }
 };
@@ -870,40 +1083,42 @@ tagged_visit(Fn&& func, Storages&&... storages) {
                                     std::forward<Storages>(storages)...);
 }
 
-template <class... Tys>
+template <class... AltStorages>
 template <class Tagged>
-CONSTEXPR17 void variant_storage<Tys...>::clear(Tagged) noexcept {
+CONSTEXPR17 void variant_storage<AltStorages...>::clear(Tagged) noexcept {
   clear<Tagged::index>();
 }
 
-template <class... Tys>
+template <class... AltStorages>
 template <std::size_t Idx>
-CONSTEXPR17 void variant_storage<Tys...>::clear() noexcept {
+CONSTEXPR17 void variant_storage<AltStorages...>::clear() noexcept {
   if constexpr (!is_valueless<Idx, variant_storage>::value) {
     destroy_union_alt<Idx>();
   }
 }
 
-template <class... Tys>
-CONSTEXPR17 void variant_storage<Tys...>::clear() noexcept {
-  if constexpr (!std::conjunction<
-                    std::is_trivially_destructible<Tys>...>::value) {
+template <class... AltStorages>
+CONSTEXPR17 void variant_storage<AltStorages...>::clear() noexcept {
+  if constexpr (!std::conjunction<typename AltStorages::
+                                      is_trivially_destructible...>::value) {
     tagged_visit([this](auto t) { this->clear(t); }, *this);
   }
 }
 
-template <class... Tys>
+template <class... AltStorages>
 template <class Tagged>
-CONSTEXPR17 void variant_storage<Tys...>::clear_to_valueless(Tagged) noexcept {
+CONSTEXPR17 void
+variant_storage<AltStorages...>::clear_to_valueless(Tagged) noexcept {
   static_assert(
       !variant_storage::no_valueless_state,
       "variant_storage cannot be valueless, please consider using clear().");
   clear_to_valueless<Tagged::index>();
 }
 
-template <class... Tys>
+template <class... AltStorages>
 template <std::size_t Idx>
-CONSTEXPR17 void variant_storage<Tys...>::clear_to_valueless() noexcept {
+CONSTEXPR17 void
+variant_storage<AltStorages...>::clear_to_valueless() noexcept {
   static_assert(
       !variant_storage::no_valueless_state,
       "variant_storage cannot be valueless, please consider using clear().");
@@ -911,13 +1126,14 @@ CONSTEXPR17 void variant_storage<Tys...>::clear_to_valueless() noexcept {
   set_raw_index(valueless_raw_index);
 }
 
-template <class... Tys>
-CONSTEXPR17 void variant_storage<Tys...>::clear_to_valueless() noexcept {
+template <class... AltStorages>
+CONSTEXPR17 void
+variant_storage<AltStorages...>::clear_to_valueless() noexcept {
   static_assert(
       !variant_storage::no_valueless_state,
       "variant_storage cannot be valueless, please consider using clear().");
-  if constexpr (!std::conjunction<
-                    std::is_trivially_destructible<Tys>...>::value) {
+  if constexpr (!std::conjunction<typename AltStorages::
+                                      is_trivially_destructible...>::value) {
     tagged_visit([this](auto t) { this->clear(t); }, *this);
   }
   set_raw_index(valueless_raw_index);
@@ -932,9 +1148,9 @@ CONSTEXPR17 void variant_storage<Tys...>::clear_to_valueless() noexcept {
 template <class Storage>
 struct can_fall_back : std::false_type { };
 
-template <class Head, class... Tails>
-struct can_fall_back<variant_storage<Head, Tails...>>
-    : std::is_nothrow_default_constructible<Head> { };
+template <class HeadAltStorage, class... TailAltStorages>
+struct can_fall_back<variant_storage<HeadAltStorage, TailAltStorages...>>
+    : HeadAltStorage::is_nothrow_default_constructible { };
 
 template <class Storage>
 struct variant_fall_back_guard {
@@ -947,22 +1163,33 @@ struct variant_fall_back_guard {
   }
 };
 
-template <class... Tys>
+template <class... AltStorages>
 template <std::size_t CurIdx, std::size_t TargetIdx, class... Args>
-CONSTEXPR20 void variant_storage<Tys...>::emplace_alt(Args&&... args) {
-  using target_type = variant_alternative_t<TargetIdx, variant<Tys...>>;
+CONSTEXPR20 void variant_storage<AltStorages...>::emplace_alt(Args&&... args) {
+  using variant_type = variant<typename AltStorages::value_type...>;
+  using target_type = variant_alternative_t<TargetIdx, variant_type>;
+  using storage_type = variant_alternative_storage<target_type>;
 
-  if constexpr (std::is_nothrow_constructible<target_type, Args&&...>::value) {
+  if constexpr (std::is_nothrow_constructible<storage_type, Args&&...>::value) {
+    // We must test the property of variant_alternative_storage here, because
+    // Args can also be variant_alternative_storage.
     this->template clear<CurIdx>();
     this->template construct_union_alt<TargetIdx>(std::forward<Args>(args)...);
-  } else if constexpr (std::is_nothrow_move_constructible<target_type>::value) {
-    target_type _temp(std::forward<Args>(args)...);
+  } else if constexpr (storage_type::is_nothrow_move_constructible::value) {
+    // We must test the property of the actual value_type of
+    // variant_alternative_storage here, see the comment of
+    // variant_assign_visitor_impl.
+    static_assert(std::is_nothrow_move_constructible<storage_type>::value,
+                  "Internal error: the value stored in "
+                  "variant_alternative_storage is nothrow-move-constructible, "
+                  "while variant_alternative_storage itself is not.");
+    storage_type _temp(std::forward<Args>(args)...);
     this->template clear<CurIdx>();
     this->template construct_union_alt<TargetIdx>(std::move(_temp));
   } else {
-    if constexpr (variant_valueless_strategy<variant<Tys...>>::value ==
+    if constexpr (variant_valueless_strategy<variant_type>::value ==
                   variant_valueless_strategy_t::FALLBACK) {
-      static_assert(can_fall_back<variant_storage<Tys...>>::value,
+      static_assert(can_fall_back<variant_storage<AltStorages...>>::value,
                     "When using the FALL_BACK strategy, the first member of "
                     "the variant must be default-constructible.");
 
@@ -974,7 +1201,7 @@ CONSTEXPR20 void variant_storage<Tys...>::emplace_alt(Args&&... args) {
           std::forward<Args>(args)...);
       _guard.target = nullptr;
     } else {
-      if constexpr (variant_valueless_strategy<variant<Tys...>>::value ==
+      if constexpr (variant_valueless_strategy<variant_type>::value ==
                     variant_valueless_strategy_t::LET_VARIANT_DECIDE) {
         this->template clear_to_valueless<CurIdx>();
       } else {
@@ -986,10 +1213,11 @@ CONSTEXPR20 void variant_storage<Tys...>::emplace_alt(Args&&... args) {
   }
 }
 
-template <class... Tys>
-struct variant_non_trivially_destructible_storage : variant_storage<Tys...> {
+template <class... AltStorages>
+struct variant_non_trivially_destructible_storage
+    : variant_storage<AltStorages...> {
   using self = variant_non_trivially_destructible_storage;
-  using base = variant_storage<Tys...>;
+  using base = variant_storage<AltStorages...>;
   using base::base;
 
   variant_non_trivially_destructible_storage() = default;
@@ -1001,19 +1229,20 @@ struct variant_non_trivially_destructible_storage : variant_storage<Tys...> {
   CONSTEXPR20 ~variant_non_trivially_destructible_storage() { this->clear(); }
 };
 
-template <class... Tys>
+template <class... AltStorages>
 using variant_destructible_storage_t = typename std::conditional<
-    std::conjunction<std::is_trivially_destructible<Tys>...>::value,
-    variant_storage<Tys...>,
-    variant_non_trivially_destructible_storage<Tys...>>::type;
+    std::conjunction<typename AltStorages::is_trivially_destructible...>::value,
+    variant_storage<AltStorages...>,
+    variant_non_trivially_destructible_storage<AltStorages...>>::type;
 
-template <class... Tys>
+template <class... AltStorages>
 struct variant_construct_visitor {
-  variant_storage<Tys...>& self;
+  variant_storage<AltStorages...>& self;
 
-  template <std::size_t Idx, class Ty>
-  CONSTEXPR17 void operator()(tagged_reference<Idx, Ty> source) const {
-    if constexpr (!std::is_same<Ty, valueless_tag>::value) {
+  template <std::size_t Idx, class AltStorageRef>
+  CONSTEXPR17 void
+  operator()(tagged_reference<Idx, AltStorageRef> source) const {
+    if constexpr (!std::is_same<AltStorageRef, valueless_tag>::value) {
       self.template construct_union_alt<Idx>(source.forward_content());
     } else {
       self.set_index(Idx);
@@ -1021,11 +1250,11 @@ struct variant_construct_visitor {
   }
 };
 
-template <class... Tys>
+template <class... AltStorages>
 struct variant_non_trivially_copy_constructible_storage
-    : variant_destructible_storage_t<Tys...> {
+    : variant_destructible_storage_t<AltStorages...> {
   using self = variant_non_trivially_copy_constructible_storage;
-  using base = variant_destructible_storage_t<Tys...>;
+  using base = variant_destructible_storage_t<AltStorages...>;
   using base::base;
 
   variant_non_trivially_copy_constructible_storage() = default;
@@ -1035,16 +1264,19 @@ struct variant_non_trivially_copy_constructible_storage
 
   CONSTEXPR17
   variant_non_trivially_copy_constructible_storage(const self& other) noexcept(
-      std::conjunction<std::is_nothrow_copy_constructible<Tys>...>::value) :
+      std::conjunction<
+          typename AltStorages::is_nothrow_copy_constructible...>::value) :
       base() {
-    tagged_visit(variant_construct_visitor<Tys...> {*this}, other.storage());
+    tagged_visit(variant_construct_visitor<AltStorages...> {*this},
+                 other.storage());
   }
 };
 
-template <class... Tys>
-struct variant_deleted_copy_storage : variant_destructible_storage_t<Tys...> {
+template <class... AltStorages>
+struct variant_deleted_copy_storage
+    : variant_destructible_storage_t<AltStorages...> {
   using self = variant_deleted_copy_storage;
-  using base = variant_destructible_storage_t<Tys...>;
+  using base = variant_destructible_storage_t<AltStorages...>;
   using base::base;
 
   variant_deleted_copy_storage() = default;
@@ -1054,20 +1286,21 @@ struct variant_deleted_copy_storage : variant_destructible_storage_t<Tys...> {
   self& operator=(self&&) = default;
 };
 
-template <class... Tys>
+template <class... AltStorages>
 using variant_copy_constructible_storage_t = typename std::conditional<
-    std::conjunction<std::is_trivially_copy_constructible<Tys>...>::value,
-    variant_destructible_storage_t<Tys...>,
+    std::conjunction<
+        typename AltStorages::is_trivially_copy_constructible...>::value,
+    variant_destructible_storage_t<AltStorages...>,
     typename std::conditional<
-        std::conjunction<std::is_copy_constructible<Tys>...>::value,
-        variant_non_trivially_copy_constructible_storage<Tys...>,
-        variant_deleted_copy_storage<Tys...>>::type>::type;
+        std::conjunction<typename AltStorages::is_copy_constructible...>::value,
+        variant_non_trivially_copy_constructible_storage<AltStorages...>,
+        variant_deleted_copy_storage<AltStorages...>>::type>::type;
 
-template <class... Tys>
+template <class... AltStorages>
 struct variant_non_trivially_move_constructible_storage
-    : variant_copy_constructible_storage_t<Tys...> {
+    : variant_copy_constructible_storage_t<AltStorages...> {
   using self = variant_non_trivially_move_constructible_storage;
-  using base = variant_copy_constructible_storage_t<Tys...>;
+  using base = variant_copy_constructible_storage_t<AltStorages...>;
   using base::base;
 
   variant_non_trivially_move_constructible_storage() = default;
@@ -1077,17 +1310,18 @@ struct variant_non_trivially_move_constructible_storage
 
   CONSTEXPR17
   variant_non_trivially_move_constructible_storage(self&& other) noexcept(
-      std::conjunction<std::is_nothrow_move_constructible<Tys>...>::value) {
-    tagged_visit(variant_construct_visitor<Tys...> {*this},
+      std::conjunction<
+          typename AltStorages::is_nothrow_move_constructible...>::value) {
+    tagged_visit(variant_construct_visitor<AltStorages...> {*this},
                  std::move(other).storage());
   }
 };
 
-template <class... Tys>
+template <class... AltStorages>
 struct variant_deleted_move_storage
-    : variant_copy_constructible_storage_t<Tys...> {
+    : variant_copy_constructible_storage_t<AltStorages...> {
   using self = variant_deleted_move_storage;
-  using base = variant_copy_constructible_storage_t<Tys...>;
+  using base = variant_copy_constructible_storage_t<AltStorages...>;
   using base::base;
 
   variant_deleted_move_storage() = default;
@@ -1097,51 +1331,102 @@ struct variant_deleted_move_storage
   self& operator=(self&&) = default;
 };
 
-template <class... Tys>
+template <class... AltStorages>
 using variant_move_constructible_storage_t = typename std::conditional<
-    std::conjunction<std::is_trivially_move_constructible<Tys>...>::value,
-    variant_copy_constructible_storage_t<Tys...>,
+    std::conjunction<
+        typename AltStorages::is_trivially_move_constructible...>::value,
+    variant_copy_constructible_storage_t<AltStorages...>,
     typename std::conditional<
-        std::conjunction<std::is_move_constructible<Tys>...>::value,
-        variant_non_trivially_move_constructible_storage<Tys...>,
-        variant_deleted_move_storage<Tys...>>::type>::type;
+        std::conjunction<typename AltStorages::is_move_constructible...>::value,
+        variant_non_trivially_move_constructible_storage<AltStorages...>,
+        variant_deleted_move_storage<AltStorages...>>::type>::type;
 
-template <std::size_t OtherIdx, class OtherTy, class... TargetTys>
+/// This class template will be used in two places:
+///
+/// 1. Used in variant_assign_visitor. TargetAltStorages will be
+/// variant_alternative_storage for all Tys. OtherTy represents the right hand
+/// side operand of the assignment. Since variant_assign_visitor handles
+/// assignment from variant, OtherTy will be variant_alternative_storage from
+/// the variant. The assignment will be performed by the assignment of the
+/// variant_alternative_storage itself.
+///
+/// 2. Used in the operator=(Ty&&) of the variant. In such cases, the rhs of the
+/// assignment will be any value provided by the user, so OtherTy will not be
+/// variant_alternative_storage.
+template <std::size_t OtherIdx, class OtherTy, class... TargetAltStorages>
 struct variant_assign_visitor_impl {
-  variant_storage<TargetTys...>& self;
+  variant_storage<TargetAltStorages...>& self;
   tagged_reference<OtherIdx, OtherTy> source;
 
-  template <std::size_t SelfIdx, class SelfTy>
-  CONSTEXPR17 void operator()(tagged_reference<SelfIdx, SelfTy> target) const {
+  template <std::size_t SelfIdx, class SelfAltStorageRef>
+  CONSTEXPR17 void
+  operator()(tagged_reference<SelfIdx, SelfAltStorageRef> target) const {
     if constexpr (std::is_same<OtherTy, valueless_tag>::value) {
       self.clear_to_valueless(target);
     } else if constexpr (SelfIdx == OtherIdx) {
       target.content = source.forward_content();
     } else {
+      // Note that source.forward_content() here may yield
+      // variant_alternative_storage or any other value that is not a
+      // specialization of variant_alternative_storage according to the value of
+      // OtherTy. Do we need to distinguish between these two cases? We can find
+      // that the construction in emplace_alt will not be affected, since the
+      // target of the construction is variant_alternative_storage, which can be
+      // constructed from both variant_alternative_storage and any other kinds
+      // of value. However, we need to choose from multiple branches in
+      // emplace_alt based on the property of the arguments. We must use the
+      // property of the ACTUAL TYPE rather than variant_alternative_storage.
+      //
+      // For example, if the target is nothrow-move-constructible, we will
+      // construct a temporary object first and move it into the variant. If we
+      // have a class with a deleted move constructor:
+      //
+      // struct A {
+      //   A(const A&) = default;
+      //   A(A&&) = delete;
+      // };
+      //
+      // then std::is_nothrow_move_constructible_v<A> or
+      // variant_alternative_storage<A>::is_nothrow_move_constructible::value
+      // will be false. However,
+      // std::is_nothrow_move_constructible_v<variant_alternative_storage<A>>
+      // will be true! This is because the defaulted move constructor of
+      // variant_alternative_storage<A> is implicitly deleted, and according to
+      // the standard, it will not participate in the overload resolution. So
+      // the compiler will use the copy constructor to perform moving operations
+      // instead. If we use the property of variant_alternative_storage<A>
+      // rather than A itself in emplace_alt, we will run into the branch and
+      // use the copy constructor to create the temporary object, which will be
+      // unexpected. Maybe in the future, we can add a new strategy to allow the
+      // variant to copy from the temporary.
+      //
+      // Fortunately, in the current implementation, the type of the target
+      // comes from variant_alternative_t, which is the actual type of the
+      // target.
       self.template emplace_alt<SelfIdx, OtherIdx>(source.forward_content());
     }
   }
 };
 
-template <class... Tys>
+template <class... AltStorages>
 struct variant_assign_visitor {
-  variant_storage<Tys...>& self;
+  variant_storage<AltStorages...>& self;
 
-  template <std::size_t SelfIdx, class SelfTy, std::size_t OtherIdx,
-            class OtherTy>
+  template <std::size_t SelfIdx, class SelfAltStorageRef, std::size_t OtherIdx,
+            class OtherAltStorageRef>
   CONSTEXPR17 void
-  operator()(tagged_reference<SelfIdx, SelfTy> target,
-             tagged_reference<OtherIdx, OtherTy> source) const {
-    return variant_assign_visitor_impl<OtherIdx, OtherTy, Tys...> {
-        self, source}(target);
+  operator()(tagged_reference<SelfIdx, SelfAltStorageRef> target,
+             tagged_reference<OtherIdx, OtherAltStorageRef> source) const {
+    return variant_assign_visitor_impl<OtherIdx, OtherAltStorageRef,
+                                       AltStorages...> {self, source}(target);
   }
 };
 
-template <class... Tys>
+template <class... AltStorages>
 struct variant_non_trivially_copy_assignable_storage
-    : variant_move_constructible_storage_t<Tys...> {
+    : variant_move_constructible_storage_t<AltStorages...> {
   using self = variant_non_trivially_copy_assignable_storage;
-  using base = variant_move_constructible_storage_t<Tys...>;
+  using base = variant_move_constructible_storage_t<AltStorages...>;
   using base::base;
 
   variant_non_trivially_copy_assignable_storage() = default;
@@ -1150,19 +1435,20 @@ struct variant_non_trivially_copy_assignable_storage
   self& operator=(self&&) = default;
 
   self& operator=(const self& other) noexcept(
-      std::conjunction<std::is_nothrow_copy_constructible<Tys>...,
-                       std::is_nothrow_copy_assignable<Tys>...>::value) {
-    tagged_visit(variant_assign_visitor<Tys...> {*this}, this->storage(),
-                 other.storage());
+      std::conjunction<
+          typename AltStorages::is_nothrow_copy_constructible...,
+          typename AltStorages::is_nothrow_copy_assignable...>::value) {
+    tagged_visit(variant_assign_visitor<AltStorages...> {*this},
+                 this->storage(), other.storage());
     return *this;
   }
 };
 
-template <class... Tys>
+template <class... AltStorages>
 struct variant_deleted_copy_assignment_storage
-    : variant_move_constructible_storage_t<Tys...> {
+    : variant_move_constructible_storage_t<AltStorages...> {
   using self = variant_deleted_copy_assignment_storage;
-  using base = variant_move_constructible_storage_t<Tys...>;
+  using base = variant_move_constructible_storage_t<AltStorages...>;
   using base::base;
 
   variant_deleted_copy_assignment_storage() = default;
@@ -1172,23 +1458,23 @@ struct variant_deleted_copy_assignment_storage
   self& operator=(self&&) = default;
 };
 
-template <class... Tys>
+template <class... AltStorages>
 using variant_copy_assignment_storage_t = typename std::conditional<
-    std::conjunction<std::is_trivially_copy_constructible<Tys>...,
-                     std::is_trivially_copy_assignable<Tys>...,
-                     std::is_trivially_destructible<Tys>...>::value,
-    variant_move_constructible_storage_t<Tys...>,
+    std::conjunction<typename AltStorages::is_trivially_copy_constructible...,
+                     typename AltStorages::is_trivially_copy_assignable...,
+                     typename AltStorages::is_trivially_destructible...>::value,
+    variant_move_constructible_storage_t<AltStorages...>,
     typename std::conditional<
-        std::conjunction<std::is_copy_constructible<Tys>...,
-                         std::is_copy_assignable<Tys>...>::value,
-        variant_non_trivially_copy_assignable_storage<Tys...>,
-        variant_deleted_copy_assignment_storage<Tys...>>::type>::type;
+        std::conjunction<typename AltStorages::is_copy_constructible...,
+                         typename AltStorages::is_copy_assignable...>::value,
+        variant_non_trivially_copy_assignable_storage<AltStorages...>,
+        variant_deleted_copy_assignment_storage<AltStorages...>>::type>::type;
 
-template <class... Tys>
+template <class... AltStorages>
 struct variant_non_trivially_move_assignable_storage
-    : variant_copy_assignment_storage_t<Tys...> {
+    : variant_copy_assignment_storage_t<AltStorages...> {
   using self = variant_non_trivially_move_assignable_storage;
-  using base = variant_copy_assignment_storage_t<Tys...>;
+  using base = variant_copy_assignment_storage_t<AltStorages...>;
   using base::base;
 
   variant_non_trivially_move_assignable_storage() = default;
@@ -1197,19 +1483,20 @@ struct variant_non_trivially_move_assignable_storage
   self& operator=(const self&) = default;
 
   self& operator=(self&& other) noexcept(
-      std::conjunction<std::is_nothrow_move_constructible<Tys>...,
-                       std::is_nothrow_move_assignable<Tys>...>::value) {
-    tagged_visit(variant_assign_visitor<Tys...> {*this}, this->storage(),
-                 std::move(other).storage());
+      std::conjunction<
+          typename AltStorages::is_nothrow_move_constructible...,
+          typename AltStorages::is_nothrow_move_assignable...>::value) {
+    tagged_visit(variant_assign_visitor<AltStorages...> {*this},
+                 this->storage(), std::move(other).storage());
     return *this;
   }
 };
 
-template <class... Tys>
+template <class... AltStorages>
 struct variant_deleted_move_assignment_storage
-    : variant_copy_assignment_storage_t<Tys...> {
+    : variant_copy_assignment_storage_t<AltStorages...> {
   using self = variant_deleted_move_assignment_storage;
-  using base = variant_copy_assignment_storage_t<Tys...>;
+  using base = variant_copy_assignment_storage_t<AltStorages...>;
   using base::base;
 
   variant_deleted_move_assignment_storage() = default;
@@ -1219,24 +1506,26 @@ struct variant_deleted_move_assignment_storage
   self& operator=(self&&) = delete;
 };
 
-template <class... Tys>
+template <class... AltStorages>
 using variant_move_assignment_storage_t = typename std::conditional<
-    std::conjunction<std::is_trivially_move_constructible<Tys>...,
-                     std::is_trivially_move_assignable<Tys>...,
-                     std::is_trivially_destructible<Tys>...>::value,
-    variant_copy_assignment_storage_t<Tys...>,
+    std::conjunction<typename AltStorages::is_trivially_move_constructible...,
+                     typename AltStorages::is_trivially_move_assignable...,
+                     typename AltStorages::is_trivially_destructible...>::value,
+    variant_copy_assignment_storage_t<AltStorages...>,
     typename std::conditional<
-        std::conjunction<std::is_move_constructible<Tys>...,
-                         std::is_move_assignable<Tys>...>::value,
-        variant_non_trivially_move_assignable_storage<Tys...>,
-        variant_deleted_move_assignment_storage<Tys...>>::type>::type;
+        std::conjunction<typename AltStorages::is_move_constructible...,
+                         typename AltStorages::is_move_assignable...>::value,
+        variant_non_trivially_move_assignable_storage<AltStorages...>,
+        variant_deleted_move_assignment_storage<AltStorages...>>::type>::type;
 
-template <class Ti>
-void narrow_conversion_checker(Ti (&&)[1]);
+template <class Ti,
+          typename std::enable_if<std::is_reference<Ti>::value, int>::type = 0>
+void narrow_conversion_checker(Ti);
 
 template <class Ty, std::size_t Idx>
 struct variant_conversion_constructor_selected_alternative {
   using type = Ty;
+  using storage_type = variant_alternative_storage<type>;
   static constexpr std::size_t index = Idx;
 };
 
@@ -1248,9 +1537,16 @@ struct check_narrow_conversion { };
 template <std::size_t Idx, class Ti, class Ty>
 struct check_narrow_conversion<
     Idx, Ti, Ty,
-    std::void_t<decltype(narrow_conversion_checker<Ti>(
+    std::void_t<decltype(narrow_conversion_checker<Ti (&&)[1]>(
         {std::declval<Ty>()}))>> {
   using type = variant_conversion_constructor_selected_alternative<Ti, Idx>;
+};
+
+template <std::size_t Idx, class Ti, class Ty>
+struct check_narrow_conversion<
+    Idx, Ti&, Ty,
+    std::void_t<decltype(narrow_conversion_checker<Ti&>(std::declval<Ty>()))>> {
+  using type = variant_conversion_constructor_selected_alternative<Ti&, Idx>;
 };
 
 template <std::size_t Idx, class Ti>
@@ -1314,16 +1610,24 @@ constexpr std::size_t find_match_index() {
 }
 
 template <class... Tys>
-class variant : private variant_move_assignment_storage_t<Tys...> {
+class variant : private variant_move_assignment_storage_t<
+                    variant_alternative_storage<Tys>...> {
+  using self = variant;
+
   static_assert(
-      std::conjunction<std::is_destructible<Tys>...>::value,
+      std::conjunction<
+          typename variant_alternative_storage<Tys>::is_destructible...>::value,
       "Cpp17Destructible requires that all types must be destructible.");
-  static_assert(std::conjunction<std::is_object<Tys>...,
-                                 std::negation<std::is_array<Tys>>...>::value,
-                "Array types and non-object types are not Cpp17Destructible.");
+  static_assert(
+      std::conjunction<std::disjunction<std::is_object<Tys>,
+                                        std::is_lvalue_reference<Tys>>...,
+                       std::negation<std::is_array<Tys>>...>::value,
+      "Array types and non-object types (except lvalue reference types) cannot "
+      "be used in variant<>.");
   static_assert(sizeof...(Tys) > 0, "Cannot construct empty variant.");
 
-  using base = variant_move_assignment_storage_t<Tys...>;
+  using base =
+      variant_move_assignment_storage_t<variant_alternative_storage<Tys>...>;
 
   template <class Ty>
   struct is_specialization_of_in_place : std::false_type { };
@@ -1338,30 +1642,31 @@ class variant : private variant_move_assignment_storage_t<Tys...> {
 public:
   using base::storage;
 
-  template <class FirstType = variant_alternative_t<0, variant>,
-            typename std::enable_if<
-                std::is_default_constructible<FirstType>::value, int>::type = 0>
+  template <class FirstType =
+                variant_alternative_storage<variant_alternative_t<0, variant>>,
+            typename std::enable_if<FirstType::is_default_constructible::value,
+                                    int>::type = 0>
   CONSTEXPR17
-  variant() noexcept(std::is_nothrow_default_constructible<FirstType>::value) :
+  variant() noexcept(FirstType::is_nothrow_default_constructible::value) :
       base(std::in_place_index<0>) { }
 
   CONSTEXPR17 variant(const variant&) = default;
   CONSTEXPR17 variant(variant&&) = default;
 
-  template <class Ty,
-            typename std::enable_if<
-                std::conjunction<
-                    std::bool_constant<(sizeof...(Tys) > 0)>,
-                    std::negation<
-                        std::is_same<typename remove_cvref<Ty>::type, variant>>,
-                    std::negation<is_specialization_of_in_place<
-                        typename remove_cvref<Ty>::type>>,
-                    std::is_constructible<
-                        typename conv_ctor_index<Ty, Tys...>::type, Ty>>::value,
-                int>::type = 0>
-  CONSTEXPR17 variant(Ty&& other) noexcept(  //
-      std::is_nothrow_constructible<typename conv_ctor_index<Ty, Tys...>::type,
-                                    Ty>::value) :
+  template <
+      class Ty,
+      typename std::enable_if<
+          std::conjunction<std::bool_constant<(sizeof...(Tys) > 0)>,
+                           std::negation<std::is_same<
+                               typename remove_cvref<Ty>::type, variant>>,
+                           std::negation<is_specialization_of_in_place<
+                               typename remove_cvref<Ty>::type>>,
+                           typename conv_ctor_index<Ty, Tys...>::storage_type::
+                               template is_constructible<Ty>>::value,
+          int>::type = 0>
+  CONSTEXPR17 variant(Ty&& other) noexcept(
+      conv_ctor_index<Ty, Tys...>::storage_type::
+          template is_nothrow_constructible<Ty>::value) :  //
       base(std::in_place_index<conv_ctor_index<Ty, Tys...>::index>,
            std::forward<Ty>(other)) { }
 
@@ -1369,51 +1674,55 @@ public:
       class Ty, class... Args,
       std::size_t MatchIndex = find_match_index<Ty, Tys...>(),
       typename std::enable_if<MatchIndex != static_cast<std::size_t>(-1) &&
-                                  std::is_constructible<Ty, Args...>::value,
+                                  variant_alternative_storage<Ty>::
+                                      template is_constructible<Args...>::value,
                               int>::type = 0>
   CONSTEXPR17 explicit variant(std::in_place_type_t<Ty>,
                                Args&&... args) noexcept(  //
-      std::is_nothrow_constructible<Ty, Args...>::value) :
+      variant_alternative_storage<Ty>::template is_nothrow_constructible<
+          Args...>::value) :
       base(std::in_place_index<MatchIndex>, std::forward<Args>(args)...) { }
 
   template <class Ty, class U, class... Args,
             std::size_t MatchIndex = find_match_index<Ty, Tys...>(),
             typename std::enable_if<
                 MatchIndex != static_cast<std::size_t>(-1) &&
-                    std::is_constructible<Ty, std::initializer_list<U>&,
-                                          Args...>::value,
+                    variant_alternative_storage<Ty>::template is_constructible<
+                        std::initializer_list<U>&, Args...>::value,
                 int>::type = 0>
   CONSTEXPR17 explicit variant(std::in_place_type_t<Ty>,
                                std::initializer_list<U> list,
                                Args&&... args) noexcept(  //
-      std::is_nothrow_constructible<Ty, std::initializer_list<U>&,
-                                    Args...>::value) :
+      variant_alternative_storage<Ty>::template is_nothrow_constructible<
+          std::initializer_list<U>&, Args...>::value) :
       base(std::in_place_index<MatchIndex>, list, std::forward<Args>(args)...) {
   }
 
   template <
       std::size_t Idx, class... Args,
       typename std::enable_if<(Idx < sizeof...(Tys)), int>::type = 0,
-      class TargetType = variant_alternative_t<Idx, variant>,
-      typename std::enable_if<std::is_constructible<TargetType, Args...>::value,
-                              int>::type = 0>
+      class TargetType =
+          variant_alternative_storage<variant_alternative_t<Idx, variant>>,
+      typename std::enable_if<
+          TargetType::template is_constructible<Args...>::value, int>::type = 0>
   CONSTEXPR17 explicit variant(std::in_place_index_t<Idx>,
                                Args&&... args) noexcept(  //
-      std::is_nothrow_constructible<TargetType, Args&&...>::value) :
+      TargetType::template is_nothrow_constructible<Args&&...>::value) :
       base(std::in_place_index<Idx>, std::forward<Args>(args)...) { }
 
-  template <std::size_t Idx, class U, class... Args,
-            typename std::enable_if<(Idx < sizeof...(Tys)), int>::type = 0,
-            class TargetType = variant_alternative_t<Idx, variant>,
-            typename std::enable_if<
-                std::is_constructible<TargetType, std::initializer_list<U>&,
-                                      Args...>::value,
-                int>::type = 0>
+  template <
+      std::size_t Idx, class U, class... Args,
+      typename std::enable_if<(Idx < sizeof...(Tys)), int>::type = 0,
+      class TargetType =
+          variant_alternative_storage<variant_alternative_t<Idx, variant>>,
+      typename std::enable_if<TargetType::template is_constructible<
+                                  std::initializer_list<U>&, Args...>::value,
+                              int>::type = 0>
   CONSTEXPR17 explicit variant(std::in_place_index_t<Idx>,
                                std::initializer_list<U> list,
                                Args&&... args) noexcept(  //
-      std::is_nothrow_constructible<TargetType, std::initializer_list<U>&,
-                                    Args&&...>::value) :
+      TargetType::template is_nothrow_constructible<std::initializer_list<U>&,
+                                                    Args&&...>::value) :
       base(std::in_place_index<Idx>, list, std::forward<Args>(args)...) { }
 
   variant& operator=(const variant&) = default;
@@ -1424,14 +1733,17 @@ public:
                 std::conjunction<
                     std::negation<
                         std::is_same<typename remove_cvref<Ty>::type, variant>>,
-                    std::is_assignable<typename Selected::type&, Ty>,
-                    std::is_constructible<typename Selected::type, Ty>>::value,
+                    typename Selected::storage_type::template is_assignable<Ty>,
+                    typename Selected::storage_type::template is_constructible<
+                        Ty>>::value,
                 int>::type = 0>
   CONSTEXPR17 variant& operator=(Ty&& other) noexcept(  //
-      (std::is_nothrow_assignable<typename Selected::type&, Ty>::value) &&
-      std::is_nothrow_constructible<typename Selected::type, Ty>::value) {
+      Selected::storage_type::template is_nothrow_assignable<Ty>::value&&
+          Selected::storage_type::template is_nothrow_constructible<
+              Ty>::value) {
     tagged_visit(
-        variant_assign_visitor_impl<Selected::index, Ty&&, Tys...> {
+        variant_assign_visitor_impl<Selected::index, Ty&&,
+                                    variant_alternative_storage<Tys>...> {
             *this,
             tagged_reference<Selected::index, Ty&&> {std::forward<Ty>(other)}},
         this->storage());
@@ -1451,7 +1763,8 @@ private:
               std::forward<Args>(args)...);
         },
         this->storage());
-    return get_variant_tagged_content<Idx>(this->storage()).content;
+    return get_variant_tagged_content<Idx>(this->storage())
+        .content.forward_value();
   }
 
 public:
@@ -1459,10 +1772,12 @@ public:
       class Ty, class... Args,
       std::size_t MatchIndex = find_match_index<Ty, Tys...>(),
       typename std::enable_if<MatchIndex != static_cast<std::size_t>(-1) &&
-                                  std::is_constructible<Ty, Args...>::value,
+                                  variant_alternative_storage<Ty>::
+                                      template is_constructible<Args...>::value,
                               int>::type = 0>
   CONSTEXPR20 Ty& emplace(Args&&... args) noexcept(
-      std::is_nothrow_constructible<Ty, Args...>::value) {
+      variant_alternative_storage<Ty>::template is_nothrow_constructible<
+          Args...>::value) {
     return emplace_impl<MatchIndex>(std::forward<Args>(args)...);
   }
 
@@ -1470,36 +1785,39 @@ public:
             std::size_t MatchIndex = find_match_index<Ty, Tys...>(),
             typename std::enable_if<
                 MatchIndex != static_cast<std::size_t>(-1) &&
-                    std::is_constructible<Ty, std::initializer_list<U>&,
-                                          Args...>::value,
+                    variant_alternative_storage<Ty>::template is_constructible<
+                        std::initializer_list<U>&, Args...>::value,
                 int>::type = 0>
   CONSTEXPR17 Ty&
   emplace(std::initializer_list<U> list, Args&&... args) noexcept(
-      std::is_nothrow_constructible<Ty, std::initializer_list<U>&,
-                                    Args...>::value) {
+      variant_alternative_storage<Ty>::template is_nothrow_constructible<
+          std::initializer_list<U>&, Args...>::value) {
     return emplace_impl<MatchIndex>(list, std::forward<Args>(args)...);
   }
 
   template <
       std::size_t Idx, class... Args,
-      class TargetType = variant_alternative_t<Idx, variant>,
-      typename std::enable_if<std::is_constructible<TargetType, Args...>::value,
-                              int>::type = 0>
-  CONSTEXPR17 TargetType& emplace(Args&&... args) noexcept(
-      std::is_nothrow_constructible<TargetType, Args...>::value) {
+      class TargetType =
+          variant_alternative_storage<variant_alternative_t<Idx, variant>>,
+      typename std::enable_if<
+          TargetType::template is_constructible<Args...>::value, int>::type = 0>
+  CONSTEXPR17 variant_alternative_t<Idx, variant>&
+  emplace(Args&&... args) noexcept(
+      TargetType::template is_nothrow_constructible<Args...>::value) {
     return emplace_impl<Idx>(std::forward<Args>(args)...);
   }
 
-  template <std::size_t Idx, class U, class... Args,
-            class TargetType = variant_alternative_t<Idx, variant>,
-            typename std::enable_if<
-                std::is_constructible<TargetType, std::initializer_list<U>&,
-                                      Args...>::value,
-                int>::type = 0>
-  CONSTEXPR17 TargetType&
+  template <
+      std::size_t Idx, class U, class... Args,
+      class TargetType =
+          variant_alternative_storage<variant_alternative_t<Idx, variant>>,
+      typename std::enable_if<TargetType::template is_constructible<
+                                  std::initializer_list<U>&, Args...>::value,
+                              int>::type = 0>
+  CONSTEXPR17 variant_alternative_t<Idx, variant>&
   emplace(std::initializer_list<U> list, Args&&... args) noexcept(
-      std::is_nothrow_constructible<TargetType, std::initializer_list<U>&,
-                                    Args...>::value) {
+      TargetType::template is_nothrow_constructible<std::initializer_list<U>&,
+                                                    Args...>::value) {
     return emplace_impl<Idx>(list, std::forward<Args>(args)...);
   }
 
@@ -1508,17 +1826,16 @@ private:
     variant& lhs_variant;
     variant& rhs_variant;
 
-    template <std::size_t LhsIdx, class LhsType, std::size_t RhsIdx,
-              class RhsType>
-    void operator()(tagged_reference<LhsIdx, LhsType> lhs,
-                    tagged_reference<RhsIdx, RhsType> rhs) const {
-      if constexpr (std::is_same<RhsType, valueless_tag>::value) {
+    template <std::size_t LhsIdx, class LhsAltStorageRef, std::size_t RhsIdx,
+              class RhsAltStorageRef>
+    void operator()(tagged_reference<LhsIdx, LhsAltStorageRef> lhs,
+                    tagged_reference<RhsIdx, RhsAltStorageRef> rhs) const {
+      if constexpr (std::is_same<RhsAltStorageRef, valueless_tag>::value) {
         unreachable();
       } else if constexpr (LhsIdx == RhsIdx) {
-        using std::swap;
-        swap(lhs.content, rhs.content);
+        lhs.content.swap(rhs.content);
       } else {
-        if constexpr (std::is_same<LhsType, valueless_tag>::value) {
+        if constexpr (std::is_same<LhsAltStorageRef, valueless_tag>::value) {
           lhs_variant.template emplace_alt<LhsIdx, RhsIdx>(
               std::move(rhs.content));
           rhs_variant.clear_to_valueless(rhs);
@@ -1534,9 +1851,10 @@ private:
 
 public:
   CONSTEXPR20 void swap(variant& rhs) noexcept(
-      std::conjunction<std::is_nothrow_move_constructible<Tys>...,
-                       std::is_nothrow_swappable<Tys>...>::value) {
-
+      std::conjunction<typename variant_alternative_storage<
+                           Tys>::is_nothrow_move_constructible...,
+                       typename variant_alternative_storage<
+                           Tys>::is_nothrow_swappable...>::value) {
     if (this->valueless_by_exception() && rhs.valueless_by_exception()) {
       return;
     } else {
@@ -1575,7 +1893,8 @@ template <class Fn, class... Variants>
 struct apply_result
     : std::invoke_result<Fn&&, decltype(get_variant_tagged_content<0>(
                                             std::declval<Variants>().storage())
-                                            .forward_content())...> { };
+                                            .forward_content()
+                                            .forward_value())...> { };
 
 template <class Fn, template <class...> class check_trait, class Check,
           class IndexSequenceList, class... Storages>
@@ -1592,7 +1911,8 @@ struct single_visit_return_type<Fn, std::index_sequence<Is...>, Storages...>
                                      Storages>::type::valueless_raw_index == Is
                                  ? 0
                                  : Is)>(std::declval<Storages>())
-                             .forward_content())...> { };
+                             .forward_content()
+                             .forward_value())...> { };
 
 template <class Fn, template <class...> class check_trait, class CheckBase,
           class... IndexSequences, class... Storages>
@@ -1650,12 +1970,14 @@ CONSTEXPR17 bool holds_alternative(const variant<Tys...>& var) noexcept {
 template <std::size_t Idx, class Variant>
 CONSTEXPR17 decltype(get_variant_tagged_content<Idx>(
                          std::declval<Variant>().storage())
-                         .forward_content())
+                         .forward_content()
+                         .forward_value())
 get_impl(Variant&& var) {
   if (var.index() != Idx)
     throw_bad_variant_access();
   return get_variant_tagged_content<Idx>(std::forward<Variant>(var).storage())
-      .forward_content();
+      .forward_content()
+      .forward_value();
 }
 
 template <std::size_t Idx, class... Tys>
@@ -1725,11 +2047,11 @@ CONSTEXPR17 const Ty&& get(const variant<Tys...>&& v) {
 template <std::size_t Idx, class Variant>
 CONSTEXPR17 typename std::add_pointer<
     decltype(get_variant_tagged_content<Idx>(std::declval<Variant>().storage())
-                 .content)>::type
+                 .content.forward_value())>::type
 get_if_impl(Variant* pv) noexcept {
   return pv && pv->index() == Idx
-             ? std::addressof(
-                   get_variant_tagged_content<Idx>(pv->storage()).content)
+             ? std::addressof(get_variant_tagged_content<Idx>(pv->storage())
+                                  .content.forward_value())
              : nullptr;
 }
 
@@ -1773,14 +2095,15 @@ template <class Op, class Variant>
 struct variant_comparison_impl {
   const Variant& lhs;
 
-  template <std::size_t Idx, class Ty>
-  CONSTEXPR17 bool operator()(tagged_reference<Idx, Ty> rhs) const {
-    if constexpr (std::is_same<Ty, valueless_tag>::value) {
+  template <std::size_t Idx, class AltStorageRef>
+  CONSTEXPR17 bool operator()(tagged_reference<Idx, AltStorageRef> rhs) const {
+    if constexpr (std::is_same<AltStorageRef, valueless_tag>::value) {
       unreachable();
     } else {
-      return Op {}(
-          get_variant_tagged_content<Idx>(lhs.storage()).forward_content(),
-          rhs.forward_content());
+      return Op {}(get_variant_tagged_content<Idx>(lhs.storage())
+                       .forward_content()
+                       .forward_value(),
+                   rhs.forward_content().forward_value());
     }
   }
 };
@@ -1876,10 +2199,13 @@ operator>=(const variant<Tys...>& lhs, const variant<Tys...>& rhs) noexcept(
               rhs.storage()));
 }
 
-template <class... Tys, typename std::enable_if<
-                            std::conjunction<std::is_move_constructible<Tys>...,
-                                             std::is_swappable<Tys>...>::value,
-                            int>::type = 0>
+template <
+    class... Tys,
+    typename std::enable_if<
+        std::conjunction<
+            typename variant_alternative_storage<Tys>::is_move_constructible...,
+            typename variant_alternative_storage<Tys>::is_swappable...>::value,
+        int>::type = 0>
 CONSTEXPR20 void swap(variant<Tys...>& lhs,
                       variant<Tys...>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
   lhs.swap(rhs);
