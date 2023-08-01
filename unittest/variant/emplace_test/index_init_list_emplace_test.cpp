@@ -10,6 +10,9 @@ TEST(VariantTestIndexInitListEmplace, Deleted) {
 
   static_assert(has_index_emplace<variant<list>, 0, list>::value);
   static_assert(has_index_emplace<variant<list>, 0, list&>::value);
+
+  static_assert(has_index_emplace<variant<list&>, 0, list>::value);
+  static_assert(has_index_emplace<variant<list&>, 0, list&>::value);
   {
     struct constructible_from_list {
       constructible_from_list(list);

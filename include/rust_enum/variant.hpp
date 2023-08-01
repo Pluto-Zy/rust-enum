@@ -299,7 +299,7 @@ public:
   template <class... Args>
   using is_nothrow_constructible =
       std::conjunction<is_constructible<Args...>,
-                       std::is_nothrow_constructible<Ty, Args...>>;
+                       std::is_nothrow_constructible<Ty&, Args...>>;
 
   using is_default_constructible = std::false_type;
   using is_trivially_default_constructible = std::false_type;

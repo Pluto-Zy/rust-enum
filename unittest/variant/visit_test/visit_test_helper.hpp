@@ -83,6 +83,26 @@ struct return_first {
   }
 };
 
+struct return_first_reference {
+  // We return the pointer rather than reference, since MSVC will perform
+  // lvalue-to-rvalue conversion when we discard the returned reference. Then it
+  // will try to read the value of the referenced object, which will be constant
+  // expression and cannot be used with constexpr.
+  //
+  // According to
+  // https://en.cppreference.com/w/cpp/language/expressions#Discarded-value_expressions
+  //
+  // - The lvalue-to-rvalue conversion is applied if and only if the expression
+  // is a volatile-qualified glvalue and ...
+  //
+  // which show that the behavior of MSVC may be incorrect. We can also find
+  // that GCC and Clang both have the correct behavior.
+  template <class... Args>
+  constexpr int* operator()(int& ref, Args&&...) const {
+    return &ref;
+  }
+};
+
 struct return_arity {
   template <class... Args>
   constexpr unsigned operator()(Args&&...) const {

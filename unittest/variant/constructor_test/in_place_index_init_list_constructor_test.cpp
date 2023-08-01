@@ -10,6 +10,12 @@ TEST(VariantTestInPlaceIndexInitListConstructor, Deleted) {
                                       list>::value);
   static_assert(std::is_constructible<variant<list>, std::in_place_index_t<0>,
                                       list&>::value);
+
+  static_assert(std::is_constructible<variant<list&>, std::in_place_index_t<0>,
+                                      list>::value);
+  static_assert(std::is_constructible<variant<list&>, std::in_place_index_t<0>,
+                                      list&>::value);
+
   {
     struct constructible_from_list {
       constructible_from_list(list);

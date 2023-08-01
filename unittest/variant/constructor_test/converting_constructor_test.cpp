@@ -41,6 +41,40 @@ TEST(VariantTestConvertingConstructor, ConvertingConstructible) {
   static_assert(
       !std::is_constructible<variant<bool>, decltype(nullptr)>::value);
 #endif
+
+  static_assert(!std::is_constructible<variant<int&>, int>::value);
+  static_assert(std::is_constructible<variant<int&>, int&>::value);
+  static_assert(!std::is_constructible<variant<int&>, float&>::value);
+  static_assert(!std::is_constructible<variant<int&>, const int&>::value);
+  static_assert(std::is_constructible<variant<int const&>, int&>::value);
+  static_assert(std::is_constructible<variant<int const&>, int const&>::value);
+  static_assert(!std::is_constructible<variant<int const&>, int>::value);
+  static_assert(!std::is_constructible<variant<int, int&>, int&>::value);
+  static_assert(std::is_constructible<variant<int&, const int&>, int&>::value);
+  static_assert(
+      std::is_constructible<variant<int&, const int&>, const int&>::value);
+  static_assert(!std::is_constructible<variant<int, const int&>, int&>::value);
+  static_assert(!std::is_constructible<variant<int&>, int*>::value);
+  static_assert(!std::is_constructible<variant<int const&>, int*>::value);
+  static_assert(!std::is_constructible<variant<int&>, int*&>::value);
+
+  {
+    struct base { };
+    struct derived : base { };
+
+    static_assert(std::is_constructible<variant<base&>, derived&>::value);
+    static_assert(
+        std::is_constructible<variant<base&, derived&>, derived&>::value);
+  }
+  {
+    struct conv {
+      operator int&();
+    };
+
+    static_assert(std::is_constructible<variant<int&>, conv&>::value);
+    static_assert(std::is_constructible<variant<int&>, conv>::value);
+    static_assert(std::is_constructible<variant<int&, conv&>, conv&>::value);
+  }
 }
 
 TEST(VariantTestConvertingConstructor, Deleted) {
@@ -92,6 +126,12 @@ TEST(VariantTestConvertingConstructor, Noexcept) {
   static_assert(
       std::is_nothrow_constructible<variant<int, const double>, int>::value);
 
+  static_assert(std::is_nothrow_constructible<variant<int&>, int&>::value);
+  static_assert(
+      std::is_nothrow_constructible<variant<int&, double&>, double&>::value);
+  static_assert(
+      std::is_nothrow_constructible<variant<std::string, int&>, int&>::value);
+
   // Test cases from MSVC STL.
   struct dummy { };
   {
@@ -119,6 +159,23 @@ TEST(VariantTestConvertingConstructor, Noexcept) {
     static_assert(
         std::is_nothrow_constructible<variant<dummy, throws_assignment>,
                                       int>::value);
+  }
+  {
+    struct throws_copy {
+      throws_copy(const throws_copy&) noexcept(false);
+    };
+    static_assert(!std::is_nothrow_constructible<variant<throws_copy>,
+                                                 throws_copy>::value);
+    static_assert(std::is_nothrow_constructible<variant<throws_copy&>,
+                                                throws_copy&>::value);
+  }
+  {
+    struct throws_conv {
+      operator int&() noexcept(false);
+    };
+
+    static_assert(
+        !std::is_nothrow_constructible<variant<int&>, throws_conv&>::value);
   }
 }
 
@@ -187,6 +244,49 @@ TEST(VariantTestConvertingConstructor, BasicBehavior) {
       v x = data;
       EXPECT_EQ(x.index(), 1);
     }
+  }
+  {
+    using v = variant<int&>;
+    int data = 3;
+    v x = data;
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(&get<0>(x), &data);
+  }
+  {
+    using v = variant<int&, double&>;
+    double data = 3.0;
+    v x = data;
+    EXPECT_EQ(x.index(), 1);
+    EXPECT_EQ(&get<1>(x), &data);
+  }
+  {
+    using v = variant<int, long&>;
+    long data = 3;
+    v x = data;
+    EXPECT_EQ(x.index(), 1);
+    EXPECT_EQ(&get<1>(x), &data);
+  }
+  {
+    struct conv {
+      int const x = 3;
+      operator const int&() { return x; }
+    };
+    using v = variant<const int&, double&>;
+    conv data;
+    v x = data;
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(&get<0>(x), &data.x);
+  }
+  {
+    struct conv {
+      int const x = 3;
+      operator const int&() { return x; }
+    };
+    using v = variant<const int&, conv&>;
+    conv data;
+    v x = data;
+    EXPECT_EQ(x.index(), 1);
+    EXPECT_EQ(&get<1>(x), &data);
   }
 }
 }  // namespace

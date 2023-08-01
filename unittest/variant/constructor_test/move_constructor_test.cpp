@@ -10,6 +10,15 @@ TEST(VariantTestMoveConstructor, Deleted) {
   static_assert(std::is_move_constructible<variant<int, const double>>::value);
   static_assert(std::is_move_constructible<variant<monostate>>::value);
   static_assert(std::is_move_constructible<variant<int, monostate>>::value);
+
+  static_assert(std::is_move_constructible<variant<int&>>::value);
+  static_assert(std::is_move_constructible<variant<float&>>::value);
+  static_assert(std::is_move_constructible<variant<int&, float>>::value);
+  static_assert(std::is_move_constructible<variant<int&, float&>>::value);
+  static_assert(std::is_move_constructible<variant<std::string&>>::value);
+  static_assert(std::is_move_constructible<variant<int const&>>::value);
+  static_assert(std::is_move_constructible<variant<int&, float const>>::value);
+
   {
     struct non_moveable {
       non_moveable(const non_moveable&) = default;
@@ -32,6 +41,10 @@ TEST(VariantTestMoveConstructor, Deleted) {
         !std::is_move_constructible<variant<non_copy_moveable>>::value);
     static_assert(
         !std::is_move_constructible<variant<int, non_copy_moveable>>::value);
+    static_assert(
+        std::is_move_constructible<variant<non_copy_moveable&>>::value);
+    static_assert(!std::is_move_constructible<
+                  variant<non_copy_moveable, non_copy_moveable&>>::value);
   }
   {
     struct non_move_assignable {
@@ -94,6 +107,17 @@ TEST(VariantTestMoveConstructor, Trivial) {
   static_assert(
       std::is_trivially_move_constructible<variant<int, monostate>>::value);
 
+  static_assert(std::is_trivially_move_constructible<variant<int&>>::value);
+  static_assert(std::is_trivially_move_constructible<variant<float&>>::value);
+  static_assert(
+      std::is_trivially_move_constructible<variant<int&, float>>::value);
+  static_assert(
+      std::is_trivially_move_constructible<variant<int&, float&>>::value);
+  static_assert(
+      std::is_trivially_move_constructible<variant<std::string&>>::value);
+  static_assert(!std::is_trivially_move_constructible<
+                variant<std::string&, std::string>>::value);
+
   {
     struct trivially_moveable {
       trivially_moveable(const trivially_moveable&);
@@ -135,6 +159,10 @@ TEST(VariantTestMoveConstructor, Trivial) {
         std::is_move_constructible<variant<trivially_move_assignable>>::value);
     static_assert(std::is_move_constructible<
                   variant<trivially_move_assignable, int>>::value);
+    static_assert(std::is_trivially_move_constructible<
+                  variant<trivially_move_assignable&>>::value);
+    static_assert(std::is_trivially_move_constructible<
+                  variant<trivially_move_assignable&, int>>::value);
   }
   {
     struct non_trivially_copyable {
@@ -162,6 +190,17 @@ TEST(VariantTestMoveConstructor, Noexcept) {
   static_assert(
       std::is_nothrow_move_constructible<variant<int, monostate>>::value);
 
+  static_assert(std::is_nothrow_move_constructible<variant<int&>>::value);
+  static_assert(std::is_nothrow_move_constructible<variant<float&>>::value);
+  static_assert(
+      std::is_nothrow_move_constructible<variant<int&, float>>::value);
+  static_assert(
+      std::is_nothrow_move_constructible<variant<int&, float&>>::value);
+  static_assert(
+      std::is_nothrow_move_constructible<variant<std::string&>>::value);
+  static_assert(std::is_nothrow_move_constructible<
+                variant<std::string&, std::string>>::value);
+
   struct nothrow_moveable {
     nothrow_moveable(const nothrow_moveable&);
     nothrow_moveable(nothrow_moveable&&) = default;
@@ -188,6 +227,10 @@ TEST(VariantTestMoveConstructor, Noexcept) {
       std::is_move_constructible<variant<throw_move_constructible>>::value);
   static_assert(std::is_move_constructible<
                 variant<int, throw_move_constructible>>::value);
+  static_assert(std::is_nothrow_move_constructible<
+                variant<throw_move_constructible&>>::value);
+  static_assert(std::is_nothrow_move_constructible<
+                variant<int, throw_move_constructible&>>::value);
 
   struct throw_move_assignable {
     throw_move_assignable(const throw_move_assignable&) = default;
@@ -210,6 +253,8 @@ TEST(VariantTestMoveConstructor, Noexcept) {
       !std::is_nothrow_move_constructible<variant<int, throw_moveable>>::value);
   static_assert(
       std::is_move_constructible<variant<int, throw_moveable>>::value);
+  static_assert(
+      std::is_nothrow_move_constructible<variant<int, throw_moveable&>>::value);
 }
 
 TEST(VariantTestMoveConstructor, BasicBehavior) {
@@ -287,6 +332,61 @@ TEST(VariantTestMoveConstructor, BasicBehavior) {
     v x2 = std::move(x1);
     EXPECT_TRUE(x2.valueless_by_exception());
   }
+  {
+    using v = variant<int const&>;
+    int const data = 3;
+    v x1 = data;
+    EXPECT_EQ(x1.index(), 0);
+    EXPECT_EQ(&get<0>(x1), &data);
+    v x2 = std::move(x1);
+    EXPECT_EQ(x1.index(), 0);
+    EXPECT_EQ(&get<0>(x1), &data);
+    EXPECT_EQ(x2.index(), 0);
+    EXPECT_EQ(&get<0>(x2), &data);
+  }
+  {
+    using v = variant<int const&, double&>;
+    double data = 3.0;
+    v x1 = data;
+    EXPECT_EQ(x1.index(), 1);
+    EXPECT_EQ(&get<1>(x1), &data);
+    v x2 = std::move(x1);
+    EXPECT_EQ(x1.index(), 1);
+    EXPECT_EQ(&get<1>(x1), &data);
+    EXPECT_EQ(x2.index(), 1);
+    EXPECT_EQ(&get<1>(x2), &data);
+  }
+  {
+    using v = variant<int const, double&>;
+    double data = 3.0;
+    v x1 = data;
+    EXPECT_EQ(x1.index(), 1);
+    EXPECT_EQ(&get<1>(x1), &data);
+    v x2 = std::move(x1);
+    EXPECT_EQ(x1.index(), 1);
+    EXPECT_EQ(&get<1>(x1), &data);
+    EXPECT_EQ(x2.index(), 1);
+    EXPECT_EQ(&get<1>(x2), &data);
+  }
+  {
+    using v = variant<counter&>;
+    counter c;
+    v x1 = c;
+    EXPECT_EQ(counter::alive_count, 1);
+    EXPECT_EQ(counter::copy_construct_count, 0);
+    EXPECT_EQ(counter::copy_assign_count, 0);
+    EXPECT_EQ(counter::move_construct_count, 0);
+    EXPECT_EQ(counter::move_assign_count, 0);
+    v x2 = std::move(x1);
+    EXPECT_EQ(&get<0>(x1), &c);
+    EXPECT_EQ(&get<0>(x2), &c);
+    EXPECT_EQ(counter::alive_count, 1);
+    EXPECT_EQ(counter::copy_construct_count, 0);
+    EXPECT_EQ(counter::copy_assign_count, 0);
+    EXPECT_EQ(counter::move_construct_count, 0);
+    EXPECT_EQ(counter::move_assign_count, 0);
+    counter::reset();
+  }
 }
 
 template <class Ty, class V>
@@ -341,6 +441,20 @@ TEST(VariantTestMoveConstructor, Constexpr) {
     static_assert(constexpr_move_construct_impl(v(nullptr), 1,
                                                 static_cast<void*>(nullptr)));
     static_assert(constexpr_move_construct_impl<const int>(v(3), 2, 3));
+  }
+  {
+    using v = variant<double&>;
+    static double data = 3.0;
+    constexpr v x = static_cast<v&&>(data);
+    static_assert(x.index() == 0);
+    static_assert(&get<double&>(x) == &data);
+  }
+  {
+    using v = variant<int const&, double&>;
+    static int const data = 3;
+    constexpr v x = static_cast<v&&>(data);
+    static_assert(x.index() == 0);
+    static_assert(&get<0>(x) == &data);
   }
 }
 }  // namespace

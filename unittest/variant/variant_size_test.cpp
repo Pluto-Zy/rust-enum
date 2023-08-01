@@ -22,6 +22,7 @@ TEST(VariantTestVariantSize, Basic) {
   variant_size_test_helper<variant<>, 0>();
   variant_size_test_helper<variant<int>, 1>();
   variant_size_test_helper<variant<float, long, double*, const int>, 4>();
+  variant_size_test_helper<variant<int&, const int&, float&, double>, 4>();
 }
 }  // namespace
 }  // namespace rust

@@ -38,6 +38,36 @@ TEST(VariantTestConvertingAssignment, ConvertingAssignable) {
 
   static_assert(!std::is_assignable<variant<bool>, decltype(nullptr)>::value);
 #endif
+
+  static_assert(!std::is_assignable<variant<int&>, int>::value);
+  static_assert(std::is_assignable<variant<int&>, int&>::value);
+  static_assert(!std::is_assignable<variant<int&>, float&>::value);
+  static_assert(!std::is_assignable<variant<int&>, const int&>::value);
+  static_assert(std::is_assignable<variant<int const&>, int&>::value);
+  static_assert(std::is_assignable<variant<int const&>, int const&>::value);
+  static_assert(!std::is_assignable<variant<int const&>, int>::value);
+  static_assert(!std::is_assignable<variant<int, int&>, int&>::value);
+  static_assert(std::is_assignable<variant<int&, const int&>, int&>::value);
+  static_assert(
+      std::is_assignable<variant<int&, const int&>, const int&>::value);
+  static_assert(!std::is_assignable<variant<int, const int&>, int&>::value);
+
+  {
+    struct base { };
+    struct derived : base { };
+
+    static_assert(std::is_assignable<variant<base&>, derived&>::value);
+    static_assert(
+        std::is_assignable<variant<base&, derived&>, derived&>::value);
+  }
+  {
+    struct conv {
+      operator int&();
+    };
+
+    static_assert(std::is_assignable<variant<int&>, conv&>::value);
+    static_assert(std::is_assignable<variant<int&>, conv>::value);
+  }
 }
 
 TEST(VariantTestConvertingAssignment, Deleted) {
@@ -84,6 +114,12 @@ TEST(VariantTestConvertingAssignment, Noexcept) {
   static_assert(
       std::is_nothrow_assignable<variant<int, const double>, int>::value);
 
+  static_assert(std::is_nothrow_assignable<variant<int&>, int&>::value);
+  static_assert(
+      std::is_nothrow_assignable<variant<int&, double&>, double&>::value);
+  static_assert(
+      std::is_nothrow_assignable<variant<std::string, int&>, int&>::value);
+
   // Test cases from MSVC STL.
   struct dummy { };
   {
@@ -110,6 +146,25 @@ TEST(VariantTestConvertingAssignment, Noexcept) {
     };
     static_assert(!std::is_nothrow_assignable<variant<dummy, throws_assignment>,
                                               int>::value);
+  }
+  {
+    struct throws_copy {
+      throws_copy& operator=(const throws_copy&) noexcept(false) {
+        return *this;
+      }
+    };
+    static_assert(
+        !std::is_nothrow_assignable<variant<throws_copy>, throws_copy>::value);
+    static_assert(
+        std::is_nothrow_assignable<variant<throws_copy&>, throws_copy&>::value);
+  }
+  {
+    struct throws_conv {
+      operator int&() noexcept(false);
+    };
+
+    static_assert(
+        !std::is_nothrow_assignable<variant<int&>, throws_conv&>::value);
   }
 }
 
@@ -281,6 +336,57 @@ TEST(VariantTestConvertingAssignment, BasicBehavior) {
     EXPECT_FALSE(x.valueless_by_exception());
     EXPECT_THROW(x = 3, int);
     EXPECT_TRUE(x.valueless_by_exception());
+  }
+  {
+    using v = variant<int&>;
+    int val = 3;
+    v x = val;
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(get<0>(x), 3);
+    int val2 = 4;
+    x = val2;
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(get<0>(x), 4);
+    EXPECT_EQ(val, 3);
+    get<0>(x) = 5;
+    EXPECT_EQ(val, 3);
+    EXPECT_EQ(val2, 5);
+  }
+  {
+    using v = variant<int&, long&>;
+    long val = 3;
+    v x = val;
+    EXPECT_EQ(x.index(), 1);
+    EXPECT_EQ(get<1>(x), 3l);
+    int val2 = 4;
+    x = val2;
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(get<0>(x), 4);
+    val2 = 5;
+    EXPECT_EQ(get<0>(x), 5);
+    x = val;
+    EXPECT_EQ(get<1>(x), 3l);
+    val = 6;
+    EXPECT_EQ(get<1>(x), 6l);
+  }
+  {
+    using v = variant<int&, long>;
+    long val = 3;
+    v x = val;
+    EXPECT_EQ(x.index(), 1);
+    EXPECT_EQ(get<1>(x), 3l);
+    val = 4;
+    EXPECT_EQ(get<1>(x), 3l);
+    get<1>(x) = 5l;
+    EXPECT_EQ(val, 4l);
+    int val2 = 4;
+    x = val2;
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(get<0>(x), 4);
+    val2 = 5;
+    EXPECT_EQ(get<0>(x), 5);
+    get<0>(x) = 6;
+    EXPECT_EQ(val2, 6);
   }
 }
 

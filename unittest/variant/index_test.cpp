@@ -35,6 +35,26 @@ TEST(VariantTestIndex, Basic) {
     x = 3;
     EXPECT_EQ(x.index(), 0);
   }
+  {
+    using v = variant<int&>;
+    static int data = 3;
+    v x1(data);
+    static_assert(std::is_same<decltype(x1.index()), std::size_t>::value);
+    static_assert(noexcept(x1.index()));
+    EXPECT_EQ(x1.index(), 0);
+    constexpr v x2(data);
+    static_assert(x2.index() == 0);
+  }
+  {
+    using v = variant<int&, long&>;
+    static long data = 3;
+    v x1(data);
+    static_assert(std::is_same<decltype(x1.index()), std::size_t>::value);
+    static_assert(noexcept(x1.index()));
+    EXPECT_EQ(x1.index(), 1);
+    constexpr v x2(data);
+    static_assert(x2.index() == 1);
+  }
 
   // TODO: export valueless_npos as public interface and test it
 }

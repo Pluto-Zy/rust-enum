@@ -219,6 +219,46 @@ TEST(VariantTestSwap, SameAlternative) {
     EXPECT_EQ(get<0>(x1).value, -1);  // x1 was moved from
     EXPECT_EQ(get<0>(x2).value, 100);
   }
+  {
+    using v = variant<int&, int>;
+    int data1 = 3, data2 = 4;
+    v x1(std::in_place_index<0>, data1);
+    v x2(std::in_place_index<0>, data2);
+    EXPECT_EQ(&get<0>(x1), &data1);
+    EXPECT_EQ(&get<0>(x2), &data2);
+
+    x1.swap(x2);
+    EXPECT_EQ(&get<0>(x1), &data2);
+    EXPECT_EQ(&get<0>(x2), &data1);
+    EXPECT_EQ(data1, 3);
+    EXPECT_EQ(data2, 4);
+
+    swap(x1, x2);
+    EXPECT_EQ(&get<0>(x1), &data1);
+    EXPECT_EQ(&get<0>(x2), &data2);
+    EXPECT_EQ(data1, 3);
+    EXPECT_EQ(data2, 4);
+  }
+  {
+    using v = variant<int&, int&>;
+    int data1 = 3, data2 = 4;
+    v x1(std::in_place_index<1>, data1);
+    v x2(std::in_place_index<1>, data2);
+    EXPECT_EQ(&get<1>(x1), &data1);
+    EXPECT_EQ(&get<1>(x2), &data2);
+
+    x1.swap(x2);
+    EXPECT_EQ(&get<1>(x1), &data2);
+    EXPECT_EQ(&get<1>(x2), &data1);
+    EXPECT_EQ(data1, 3);
+    EXPECT_EQ(data2, 4);
+
+    swap(x1, x2);
+    EXPECT_EQ(&get<1>(x1), &data1);
+    EXPECT_EQ(&get<1>(x2), &data2);
+    EXPECT_EQ(data1, 3);
+    EXPECT_EQ(data2, 4);
+  }
 }
 
 struct non_throwing_non_noexcept_type {
@@ -345,6 +385,49 @@ TEST(VariantTestSwap, DifferentAlternatives) {
     EXPECT_TRUE(x1.valueless_by_exception());
     EXPECT_EQ(get<0>(x2).value, 42);
   }
+  {
+    using v = variant<int&, int&>;
+    int data1 = 3, data2 = 4;
+    v x1(std::in_place_index<0>, data1);
+    v x2(std::in_place_index<1>, data2);
+    EXPECT_EQ(&get<0>(x1), &data1);
+    EXPECT_EQ(&get<1>(x2), &data2);
+
+    x1.swap(x2);
+    EXPECT_EQ(&get<1>(x1), &data2);
+    EXPECT_EQ(&get<0>(x2), &data1);
+    EXPECT_EQ(data1, 3);
+    EXPECT_EQ(data2, 4);
+
+    swap(x1, x2);
+    EXPECT_EQ(&get<0>(x1), &data1);
+    EXPECT_EQ(&get<1>(x2), &data2);
+    EXPECT_EQ(data1, 3);
+    EXPECT_EQ(data2, 4);
+  }
+  {
+    using v = variant<long&, int const&>;
+    long data1 = 3;
+    int data2 = 4;
+    v x1(data1);
+    v x2(data2);
+    EXPECT_EQ(x1.index(), 0);
+    EXPECT_EQ(x2.index(), 1);
+
+    x1.swap(x2);
+    EXPECT_EQ(x1.index(), 1);
+    EXPECT_EQ(x2.index(), 0);
+    EXPECT_EQ(&get<1>(x1), &data2);
+    EXPECT_EQ(&get<0>(x2), &data1);
+    EXPECT_EQ(data1, 3l);
+    EXPECT_EQ(data2, 4);
+
+    swap(x1, x2);
+    EXPECT_EQ(x1.index(), 0);
+    EXPECT_EQ(x2.index(), 1);
+    EXPECT_EQ(&get<0>(x1), &data1);
+    EXPECT_EQ(&get<1>(x2), &data2);
+  }
 }
 
 struct not_swappable { };
@@ -404,6 +487,49 @@ TEST(VariantTestSwap, Noexcept) {
     v x1, x2;
     using std::swap;
     swap(x1, x2);
+  }
+  {
+    using v = variant<int&>;
+    static_assert(std::is_swappable<v>::value);
+    static_assert(std::is_nothrow_swappable<v>::value);
+
+    int data = 3;
+    v x1(data), x2(data);
+    x1.swap(x2);
+    using std::swap;
+    swap(x1, x2);
+  }
+  {
+    using v = variant<int&, const int&>;
+    static_assert(std::is_swappable<v>::value);
+    static_assert(std::is_nothrow_swappable<v>::value);
+
+    int data = 3;
+    v x1(data), x2(data);
+    x1.swap(x2);
+    using std::swap;
+    swap(x1, x2);
+  }
+  {
+    using v = variant<int&, long&>;
+    static_assert(std::is_swappable<v>::value);
+    static_assert(std::is_nothrow_swappable<v>::value);
+
+    long data = 3;
+    v x1(data), x2(data);
+    x1.swap(x2);
+    using std::swap;
+    swap(x1, x2);
+  }
+  {
+    using v = variant<const int, int&>;
+    static_assert(!std::is_swappable<v>::value);
+  }
+  {
+    using v = variant<nothrow_move_ctor&, throwing_type_with_nothrow_swap&,
+                      throwing_move_assign_nothrow_move_ctor&>;
+    static_assert(std::is_swappable<v>::value);
+    static_assert(std::is_nothrow_swappable<v>::value);
   }
 }
 }  // namespace

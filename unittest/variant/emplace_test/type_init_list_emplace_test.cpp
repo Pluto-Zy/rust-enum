@@ -18,6 +18,9 @@ TEST(VariantTestTypeInitListEmplace, Deleted) {
       has_type_emplace<variant<list, std::initializer_list<double>, list>,
                        std::initializer_list<double>,
                        std::initializer_list<double>>::value);
+
+  static_assert(has_type_emplace<variant<list&>, list&, list>::value);
+  static_assert(has_type_emplace<variant<list&>, list&, list&>::value);
   {
     struct constructible_from_list {
       explicit constructible_from_list(list);

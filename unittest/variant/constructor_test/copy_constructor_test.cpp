@@ -10,6 +10,15 @@ TEST(VariantTestCopyConstructor, Deleted) {
   static_assert(std::is_copy_constructible<variant<int, const double>>::value);
   static_assert(std::is_copy_constructible<variant<monostate>>::value);
   static_assert(std::is_copy_constructible<variant<int, monostate>>::value);
+
+  static_assert(std::is_copy_constructible<variant<int&>>::value);
+  static_assert(std::is_copy_constructible<variant<float&>>::value);
+  static_assert(std::is_copy_constructible<variant<int&, float>>::value);
+  static_assert(std::is_copy_constructible<variant<int&, float&>>::value);
+  static_assert(std::is_copy_constructible<variant<std::string&>>::value);
+  static_assert(std::is_copy_constructible<variant<int const&>>::value);
+  static_assert(std::is_copy_constructible<variant<int&, float const>>::value);
+
   {
     struct non_copyable {
       non_copyable(const non_copyable&) = delete;
@@ -20,6 +29,12 @@ TEST(VariantTestCopyConstructor, Deleted) {
     static_assert(!std::is_copy_constructible<variant<non_copyable>>::value);
     static_assert(
         !std::is_copy_constructible<variant<int, non_copyable>>::value);
+    static_assert(
+        std::is_copy_constructible<variant<int, non_copyable&>>::value);
+    static_assert(
+        std::is_copy_constructible<variant<int, non_copyable const&>>::value);
+    static_assert(!std::is_copy_constructible<
+                  variant<int, non_copyable&, non_copyable>>::value);
   }
   {
     struct non_copy_assignable {
@@ -42,6 +57,8 @@ TEST(VariantTestCopyConstructor, Deleted) {
     };
     static_assert(!std::is_copy_constructible<variant<move_only>>::value);
     static_assert(!std::is_copy_constructible<variant<int, move_only>>::value);
+    static_assert(std::is_copy_constructible<variant<move_only&>>::value);
+    static_assert(std::is_copy_constructible<variant<int, move_only&>>::value);
   }
 }
 
@@ -57,6 +74,17 @@ TEST(VariantTestCopyConstructor, Trivial) {
       std::is_trivially_copy_constructible<variant<monostate>>::value);
   static_assert(
       std::is_trivially_copy_constructible<variant<int, monostate>>::value);
+
+  static_assert(std::is_trivially_copy_constructible<variant<int&>>::value);
+  static_assert(std::is_trivially_copy_constructible<variant<float&>>::value);
+  static_assert(
+      std::is_trivially_copy_constructible<variant<int&, float>>::value);
+  static_assert(
+      std::is_trivially_copy_constructible<variant<int&, float&>>::value);
+  static_assert(
+      std::is_trivially_copy_constructible<variant<std::string&>>::value);
+  static_assert(!std::is_trivially_copy_constructible<
+                variant<std::string&, std::string>>::value);
 
   {
     struct trivially_copyable {
@@ -96,6 +124,10 @@ TEST(VariantTestCopyConstructor, Trivial) {
         std::is_copy_constructible<variant<trivially_copy_assignable>>::value);
     static_assert(std::is_copy_constructible<
                   variant<trivially_copy_assignable, int>>::value);
+    static_assert(std::is_trivially_copy_constructible<
+                  variant<trivially_copy_assignable&>>::value);
+    static_assert(std::is_trivially_copy_constructible<
+                  variant<trivially_copy_assignable&, int>>::value);
   }
   {
     struct non_trivially_moveable {
@@ -129,6 +161,10 @@ TEST(VariantTestCopyConstructor, Trivial) {
         std::is_copy_constructible<variant<non_trivially_copyable>>::value);
     static_assert(std::is_copy_constructible<
                   variant<non_trivially_copyable, int>>::value);
+    static_assert(std::is_trivially_copy_constructible<
+                  variant<non_trivially_copyable&>>::value);
+    static_assert(std::is_trivially_copy_constructible<
+                  variant<non_trivially_copyable&, int>>::value);
   }
 }
 
@@ -141,6 +177,17 @@ TEST(VariantTestCopyConstructor, Noexcept) {
   static_assert(std::is_nothrow_copy_constructible<variant<monostate>>::value);
   static_assert(
       std::is_nothrow_copy_constructible<variant<int, monostate>>::value);
+
+  static_assert(std::is_nothrow_copy_constructible<variant<int&>>::value);
+  static_assert(std::is_nothrow_copy_constructible<variant<float&>>::value);
+  static_assert(
+      std::is_nothrow_copy_constructible<variant<int&, float>>::value);
+  static_assert(
+      std::is_nothrow_copy_constructible<variant<int&, float&>>::value);
+  static_assert(
+      std::is_nothrow_copy_constructible<variant<std::string&>>::value);
+  static_assert(!std::is_nothrow_copy_constructible<
+                variant<std::string&, std::string>>::value);
 
   struct nothrow_copyable {
     nothrow_copyable(const nothrow_copyable&) = default;
@@ -168,6 +215,10 @@ TEST(VariantTestCopyConstructor, Noexcept) {
       std::is_copy_constructible<variant<throw_copy_constructible>>::value);
   static_assert(std::is_copy_constructible<
                 variant<int, throw_copy_constructible>>::value);
+  static_assert(std::is_nothrow_copy_constructible<
+                variant<throw_copy_constructible&>>::value);
+  static_assert(std::is_nothrow_copy_constructible<
+                variant<int, throw_copy_constructible&>>::value);
 
   struct throw_copy_assignable {
     throw_copy_assignable(const throw_copy_assignable&) = default;
@@ -190,6 +241,8 @@ TEST(VariantTestCopyConstructor, Noexcept) {
       !std::is_nothrow_copy_constructible<variant<int, throw_copyable>>::value);
   static_assert(
       std::is_copy_constructible<variant<int, throw_copyable>>::value);
+  static_assert(
+      std::is_nothrow_copy_constructible<variant<int, throw_copyable&>>::value);
 }
 
 TEST(VariantTestCopyConstructor, BasicBehavior) {
@@ -265,6 +318,61 @@ TEST(VariantTestCopyConstructor, BasicBehavior) {
     v x2 = x1;
     EXPECT_TRUE(x2.valueless_by_exception());
   }
+  {
+    using v = variant<int const&>;
+    int const data = 3;
+    v x1 = data;
+    EXPECT_EQ(x1.index(), 0);
+    EXPECT_EQ(&get<0>(x1), &data);
+    v x2 = x1;
+    EXPECT_EQ(x1.index(), 0);
+    EXPECT_EQ(&get<0>(x1), &data);
+    EXPECT_EQ(x2.index(), 0);
+    EXPECT_EQ(&get<0>(x2), &data);
+  }
+  {
+    using v = variant<int const&, double&>;
+    double data = 3.0;
+    v x1 = data;
+    EXPECT_EQ(x1.index(), 1);
+    EXPECT_EQ(&get<1>(x1), &data);
+    v x2 = x1;
+    EXPECT_EQ(x1.index(), 1);
+    EXPECT_EQ(&get<1>(x1), &data);
+    EXPECT_EQ(x2.index(), 1);
+    EXPECT_EQ(&get<1>(x2), &data);
+  }
+  {
+    using v = variant<int const, double&>;
+    double data = 3.0;
+    v x1 = data;
+    EXPECT_EQ(x1.index(), 1);
+    EXPECT_EQ(&get<1>(x1), &data);
+    v x2 = x1;
+    EXPECT_EQ(x1.index(), 1);
+    EXPECT_EQ(&get<1>(x1), &data);
+    EXPECT_EQ(x2.index(), 1);
+    EXPECT_EQ(&get<1>(x2), &data);
+  }
+  {
+    using v = variant<counter&>;
+    counter c;
+    v x1 = c;
+    EXPECT_EQ(counter::alive_count, 1);
+    EXPECT_EQ(counter::copy_construct_count, 0);
+    EXPECT_EQ(counter::copy_assign_count, 0);
+    EXPECT_EQ(counter::move_construct_count, 0);
+    EXPECT_EQ(counter::move_assign_count, 0);
+    v x2 = x1;
+    EXPECT_EQ(&get<0>(x1), &c);
+    EXPECT_EQ(&get<0>(x2), &c);
+    EXPECT_EQ(counter::alive_count, 1);
+    EXPECT_EQ(counter::copy_construct_count, 0);
+    EXPECT_EQ(counter::copy_assign_count, 0);
+    EXPECT_EQ(counter::move_construct_count, 0);
+    EXPECT_EQ(counter::move_assign_count, 0);
+    counter::reset();
+  }
 }
 
 template <class Ty, class V>
@@ -337,6 +445,28 @@ TEST(VariantTestCopyConstructor, Constexpr) {
       static_assert(get<copyable>(x2).value == 3);
       static_assert(get<1>(x2).value == 3);
     }
+  }
+  {
+    using v = variant<double&>;
+    static double data = 3.0;
+    constexpr v x1 = data;
+    static_assert(x1.index() == 0);
+    static_assert(&get<double&>(x1) == &data);
+    constexpr v x2 = x1;
+    static_assert(x2.index() == 0);
+    static_assert(&get<double&>(x2) == &data);
+  }
+  {
+    using v = variant<int const&, double&>;
+    static int const data = 3;
+    constexpr v x1 = data;
+    static_assert(x1.index() == 0);
+    static_assert(&get<0>(x1) == &data);
+    constexpr v x2 = x1;
+    static_assert(x1.index() == 0);
+    static_assert(&get<0>(x1) == &data);
+    static_assert(x2.index() == 0);
+    static_assert(&get<0>(x2) == &data);
   }
   {
     using v = variant<long, void*, const int>;

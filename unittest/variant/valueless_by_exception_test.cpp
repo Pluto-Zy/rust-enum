@@ -47,6 +47,15 @@ TEST(VariantTestValuelessByException, Basic) {
     make_valueless(x);
     EXPECT_TRUE(x.valueless_by_exception());
   }
+  {
+    using v = variant<int&, long&>;
+    static long data = 3;
+    constexpr v x(data);
+    static_assert(
+        std::is_same<decltype(x.valueless_by_exception()), bool>::value);
+    static_assert(noexcept(x.valueless_by_exception()));
+    static_assert(!x.valueless_by_exception());
+  }
 }
 }  // namespace
 }  // namespace rust

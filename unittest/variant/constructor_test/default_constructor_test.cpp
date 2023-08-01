@@ -9,6 +9,11 @@ TEST(VariantTestDefaultConstructor, Deleted) {
   static_assert(std::is_default_constructible<variant<monostate>>::value);
   static_assert(std::is_default_constructible<variant<int, monostate>>::value);
 
+  static_assert(!std::is_default_constructible<variant<int&>>::value);
+  static_assert(!std::is_default_constructible<variant<int const&>>::value);
+  static_assert(!std::is_default_constructible<variant<int&, int>>::value);
+  static_assert(std::is_default_constructible<variant<int, int&>>::value);
+
   {
     struct non_default_constructible {
       non_default_constructible(int);
@@ -30,6 +35,14 @@ TEST(VariantTestDefaultConstructor, Noexcept) {
       std::is_nothrow_default_constructible<variant<monostate>>::value);
   static_assert(
       std::is_nothrow_default_constructible<variant<int, monostate>>::value);
+
+  static_assert(!std::is_nothrow_default_constructible<variant<int&>>::value);
+  static_assert(
+      !std::is_nothrow_default_constructible<variant<int const&>>::value);
+  static_assert(
+      !std::is_nothrow_default_constructible<variant<int&, int>>::value);
+  static_assert(
+      std::is_nothrow_default_constructible<variant<int, int&>>::value);
 
   {
     struct may_throw_default_constructible {

@@ -47,6 +47,54 @@ TEST(VariantTestInPlaceIndexConstructor, Deleted) {
       std::is_constructible<variant<int, long, int*>, std::in_place_index_t<2>,
                             std::nullptr_t>::value);
 
+  static_assert(std::is_constructible<variant<int&>, std::in_place_index_t<0>,
+                                      int&>::value);
+  static_assert(!std::is_constructible<variant<int&>, std::in_place_index_t<0>,
+                                       short&>::value);
+  static_assert(!std::is_constructible<variant<int&>, std::in_place_index_t<0>,
+                                       int>::value);
+  static_assert(!std::is_constructible<variant<int&>, std::in_place_index_t<1>,
+                                       int&>::value);
+  static_assert(std::is_constructible<variant<int&, int&>,
+                                      std::in_place_index_t<0>, int&>::value);
+  static_assert(std::is_constructible<variant<int&, int&>,
+                                      std::in_place_index_t<1>, int&>::value);
+  static_assert(!std::is_constructible<variant<int&, int&>,
+                                       std::in_place_index_t<2>, int&>::value);
+  static_assert(std::is_constructible<variant<long&, int&>,
+                                      std::in_place_index_t<0>, long&>::value);
+  static_assert(!std::is_constructible<variant<long&, int&>,
+                                       std::in_place_index_t<1>, long&>::value);
+  static_assert(!std::is_constructible<variant<long&, int&>,
+                                       std::in_place_index_t<2>, long&>::value);
+  static_assert(std::is_constructible<variant<int, int&>,
+                                      std::in_place_index_t<0>, int&>::value);
+  static_assert(std::is_constructible<variant<int, int&>,
+                                      std::in_place_index_t<1>, int&>::value);
+  static_assert(!std::is_constructible<variant<int, int&>,
+                                       std::in_place_index_t<2>, int&>::value);
+  static_assert(std::is_constructible<variant<long&, int>,
+                                      std::in_place_index_t<0>, long&>::value);
+  static_assert(std::is_constructible<variant<long&, int>,
+                                      std::in_place_index_t<1>, long&>::value);
+  static_assert(!std::is_constructible<variant<long&, int>,
+                                       std::in_place_index_t<2>, long&>::value);
+  static_assert(
+      !std::is_constructible<variant<int&, std::string&>,
+                             std::in_place_index_t<1>, const char*>::value);
+  static_assert(!std::is_constructible<variant<int&, std::string&>,
+                                       std::in_place_index_t<1>,
+                                       const char(&)[3]>::value);
+  static_assert(
+      !std::is_constructible<variant<int&, const int&>,
+                             std::in_place_index_t<0>, const int&>::value);
+  static_assert(
+      std::is_constructible<variant<int&, const int&>, std::in_place_index_t<1>,
+                            const int&>::value);
+  static_assert(
+      !std::is_constructible<variant<int&, const int&>,
+                             std::in_place_index_t<2>, const int&>::value);
+
   {
     struct more_arguments {
       more_arguments(int, double, float);
@@ -72,6 +120,9 @@ TEST(VariantTestInPlaceIndexConstructor, Deleted) {
     static_assert(!std::is_constructible<variant<int, more_arguments>,
                                          std::in_place_index_t<1>, int, int,
                                          double, float>::value);
+    static_assert(!std::is_constructible<variant<more_arguments&>,
+                                         std::in_place_index_t<0>, int, double,
+                                         double>::value);
   }
 }
 
@@ -103,6 +154,40 @@ TEST(VariantTestInPlaceIndexConstructor, Noexcept) {
   static_assert(std::is_nothrow_constructible<variant<int, long, int*>,
                                               std::in_place_index_t<2>,
                                               std::nullptr_t>::value);
+
+  static_assert(
+      std::is_nothrow_constructible<variant<int&>, std::in_place_index_t<0>,
+                                    int&>::value);
+  static_assert(
+      std::is_nothrow_constructible<variant<int&, int&>,
+                                    std::in_place_index_t<0>, int&>::value);
+  static_assert(
+      std::is_nothrow_constructible<variant<int&, int&>,
+                                    std::in_place_index_t<1>, int&>::value);
+  static_assert(
+      std::is_nothrow_constructible<variant<long&, int&>,
+                                    std::in_place_index_t<0>, long&>::value);
+  static_assert(
+      !std::is_nothrow_constructible<variant<long&, int&>,
+                                     std::in_place_index_t<1>, long&>::value);
+  static_assert(
+      std::is_nothrow_constructible<variant<int, int&>,
+                                    std::in_place_index_t<0>, int&>::value);
+  static_assert(
+      std::is_nothrow_constructible<variant<int, int&>,
+                                    std::in_place_index_t<1>, int&>::value);
+  static_assert(
+      std::is_nothrow_constructible<variant<long&, int>,
+                                    std::in_place_index_t<0>, long&>::value);
+  static_assert(
+      std::is_nothrow_constructible<variant<long&, int>,
+                                    std::in_place_index_t<1>, long&>::value);
+  static_assert(std::is_nothrow_constructible<variant<int&, std::string const&>,
+                                              std::in_place_index_t<1>,
+                                              std::string&>::value);
+  static_assert(std::is_nothrow_constructible<variant<int&, const int&>,
+                                              std::in_place_index_t<1>,
+                                              const int&>::value);
 
   {
     struct may_throw_constructible {
@@ -244,6 +329,36 @@ TEST(VariantTestInPlaceIndexConstructor, BasicBehavior) {
     EXPECT_EQ(x.index(), 0);
     EXPECT_EQ(get<0>(x), 5);
   }
+  {
+    using v = variant<int&>;
+    int data = 3;
+    v x(std::in_place_index<0>, data);
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_TRUE(holds_alternative<int&>(x));
+    EXPECT_EQ(&get<int&>(x), &data);
+  }
+  {
+    using v = variant<int&, int&>;
+    int data = 3;
+    v x(std::in_place_index<1>, data);
+    EXPECT_EQ(x.index(), 1);
+    EXPECT_EQ(&get<1>(x), &data);
+  }
+  {
+    struct conv {
+      int data = 3;
+      operator int&() { return data; }
+    };
+
+    using v = variant<int&, conv&>;
+    conv c;
+    v x1(std::in_place_index<0>, c);
+    EXPECT_EQ(x1.index(), 0);
+    EXPECT_EQ(&get<0>(x1), &c.data);
+    v x2(std::in_place_index<1>, c);
+    EXPECT_EQ(x2.index(), 1);
+    EXPECT_EQ(&get<1>(x2), &c);
+  }
 }
 
 TEST(VariantTestInPlaceIndexConstructor, Constexpr) {
@@ -285,6 +400,21 @@ TEST(VariantTestInPlaceIndexConstructor, Constexpr) {
     constexpr v x(std::in_place_index<1>, 3);
     static_assert(x.index() == 1);
     static_assert(get<1>(x).val == 3);
+  }
+  {
+    using v = variant<int&>;
+    static int data = 3;
+    constexpr v x(std::in_place_index<0>, data);
+    static_assert(x.index() == 0);
+    static_assert(holds_alternative<int&>(x));
+    static_assert(&get<int&>(x) == &data);
+  }
+  {
+    using v = variant<int&, int&>;
+    static int data = 3;
+    constexpr v x(std::in_place_index<1>, data);
+    static_assert(x.index() == 1);
+    static_assert(&get<1>(x) == &data);
   }
 }
 }  // namespace

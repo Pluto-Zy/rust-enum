@@ -92,6 +92,48 @@ void ret_visit_forward_call_operator_test_impl() {
     EXPECT_TRUE((fn::check_call<long&, std::string&, int*&, double&>(
         CT_CONST | CT_RVALUE)));
   }
+  {
+    using v = variant<int&>;
+    int data = 3;
+    v x(data);
+    rust::visit<Ret>(obj, x);
+    EXPECT_TRUE(fn::check_call<int&>(CT_NON_CONST | CT_LVALUE));
+    rust::visit<Ret>(cobj, x);
+    EXPECT_TRUE(fn::check_call<int&>(CT_CONST | CT_LVALUE));
+    rust::visit<Ret>(std::move(obj), x);
+    EXPECT_TRUE(fn::check_call<int&>(CT_NON_CONST | CT_RVALUE));
+    rust::visit<Ret>(std::move(cobj), x);
+    EXPECT_TRUE(fn::check_call<int&>(CT_CONST | CT_RVALUE));
+  }
+  {
+    using v = variant<int&, const long&, double&>;
+    long data = 3;
+    v x(data);
+    rust::visit<Ret>(obj, x);
+    EXPECT_TRUE(fn::check_call<const long&>(CT_NON_CONST | CT_LVALUE));
+    rust::visit<Ret>(cobj, x);
+    EXPECT_TRUE(fn::check_call<const long&>(CT_CONST | CT_LVALUE));
+    rust::visit<Ret>(std::move(obj), x);
+    EXPECT_TRUE(fn::check_call<const long&>(CT_NON_CONST | CT_RVALUE));
+    rust::visit<Ret>(std::move(cobj), x);
+    EXPECT_TRUE(fn::check_call<const long&>(CT_CONST | CT_RVALUE));
+  }
+  {
+    using v1 = variant<int&, double&>;
+    using v2 = variant<float&, std::string&>;
+    double data1 = 3.0;
+    float data2 = 4.0f;
+    v1 x1(data1);
+    v2 x2(data2);
+    rust::visit<Ret>(obj, x1, x2);
+    EXPECT_TRUE((fn::check_call<double&, float&>(CT_NON_CONST | CT_LVALUE)));
+    rust::visit<Ret>(cobj, x1, x2);
+    EXPECT_TRUE((fn::check_call<double&, float&>(CT_CONST | CT_LVALUE)));
+    rust::visit<Ret>(std::move(obj), x1, x2);
+    EXPECT_TRUE((fn::check_call<double&, float&>(CT_NON_CONST | CT_RVALUE)));
+    rust::visit<Ret>(std::move(cobj), x1, x2);
+    EXPECT_TRUE((fn::check_call<double&, float&>(CT_CONST | CT_RVALUE)));
+  }
 }
 
 TEST(VariantTestReturnVisit, ForwardCallOperator) {
@@ -150,6 +192,37 @@ void ret_visit_forward_argument_test_impl() {
     EXPECT_TRUE(
         (fn::check_call<const long&, const std::string&, int*&&, double&&>(
             expected)));
+  }
+  {
+    using v = variant<int&>;
+    int data = 3;
+    v x(data);
+    const v& cx(x);
+    rust::visit<Ret>(obj, x);
+    EXPECT_TRUE(fn::check_call<int&>(expected));
+    rust::visit<Ret>(obj, cx);
+    EXPECT_TRUE(fn::check_call<int&>(expected));
+    rust::visit<Ret>(obj, std::move(x));
+    EXPECT_TRUE(fn::check_call<int&>(expected));
+    rust::visit<Ret>(obj, std::move(cx));
+    EXPECT_TRUE(fn::check_call<int&>(expected));
+  }
+  {
+    using v = variant<int&, const long&, float>;
+    int data1 = 3;
+    long data2 = 4;
+    float data3 = 5.f;
+    v x1(data1), x2(data2), x3(data3);
+    rust::visit<Ret>(obj, x1, x2, x3);
+    EXPECT_TRUE((fn::check_call<int&, const long&, float&>(expected)));
+    rust::visit<Ret>(obj, std::as_const(x1), std::as_const(x2),
+                     std::as_const(x3));
+    EXPECT_TRUE((fn::check_call<int&, const long&, const float&>(expected)));
+    rust::visit<Ret>(obj, std::move(x1), std::move(x2), std::move(x3));
+    EXPECT_TRUE((fn::check_call<int&, const long&, float&&>(expected)));
+    rust::visit<Ret>(obj, static_cast<v const&&>(x1),
+                     static_cast<v const&&>(x2), static_cast<v const&&>(x3));
+    EXPECT_TRUE((fn::check_call<int&, const long&, const float&&>(expected)));
   }
 }
 
@@ -240,6 +313,35 @@ void ret_visit_return_type_test_impl() {
                                                          x2, x3, x4)),
                                Ret>::value);
   }
+  {
+    using v = variant<int&>;
+    int data = 3;
+    v x(data);
+    static_assert(std::is_same<decltype(rust::visit<Ret>(obj, x)), Ret>::value);
+    static_assert(
+        std::is_same<decltype(rust::visit<Ret>(cobj, x)), Ret>::value);
+    static_assert(std::is_same<decltype(rust::visit<Ret>(std::move(obj), x)),
+                               Ret>::value);
+    static_assert(std::is_same<decltype(rust::visit<Ret>(std::move(cobj), x)),
+                               Ret>::value);
+  }
+  {
+    using v = variant<int&, const long&, float>;
+    int data1 = 3;
+    long data2 = 4;
+    float data3 = 5.f;
+    v x1(data1), x2(data2), x3(data3);
+    static_assert(
+        std::is_same<decltype(rust::visit<Ret>(obj, x1, x2, x3)), Ret>::value);
+    static_assert(
+        std::is_same<decltype(rust::visit<Ret>(cobj, x1, x2, x3)), Ret>::value);
+    static_assert(
+        std::is_same<decltype(rust::visit<Ret>(std::move(obj), x1, x2, x3)),
+                     Ret>::value);
+    static_assert(
+        std::is_same<decltype(rust::visit<Ret>(std::move(cobj), x1, x2, x3)),
+                     Ret>::value);
+  }
 }
 
 struct simple_base {
@@ -292,6 +394,7 @@ TEST(VariantTestReturnVisit, ReturnType) {
 
 TEST(VariantTestReturnVisit, ConstexprVoid) {
   constexpr return_first first {};
+  constexpr return_first_reference first_ref {};
   constexpr return_arity arity {};
 
   {
@@ -323,10 +426,40 @@ TEST(VariantTestReturnVisit, ConstexprVoid) {
     constexpr v x1(3l), x2(2), x3(nullptr), x4(1.1);
     static_assert((rust::visit<void>(arity, x1, x2, x3, x4), 4) == 4);
   }
+  {
+    using v = variant<int&>;
+    static int data = 3;
+    constexpr v x(data);
+    static_assert((rust::visit<void>(first_ref, x), 3) == 3);
+  }
+  {
+    using v = variant<int&, const long&, float>;
+    static int data1 = 3;
+    static long data2 = 4;
+    constexpr float data3 = 5.f;
+    constexpr v x1(data1), x2(data2), x3(data3);
+    static_assert((rust::visit<void>(arity, x1, x2, x3), 3) == 3);
+  }
+}
+
+struct FromReference {
+  void* ptr;
+
+  template <class T>
+  constexpr FromReference(T* ref) : ptr(ref) { }
+};
+
+constexpr bool operator==(FromReference lhs, void* rhs) {
+  return lhs.ptr == rhs;
+}
+
+constexpr bool operator!=(FromReference lhs, void* rhs) {
+  return !(lhs == rhs);
 }
 
 TEST(VariantTestReturnVisit, ConstexprOther) {
   constexpr return_first first {};
+  constexpr return_first_reference first_ref {};
   constexpr return_arity arity {};
 
   {
@@ -360,6 +493,21 @@ TEST(VariantTestReturnVisit, ConstexprOther) {
     using v = variant<int, long, double, long long, int*>;
     constexpr v x1(3l), x2(2), x3(nullptr), x4(1.1);
     static_assert(rust::visit<int>(arity, x1, x2, x3, x4) == 4);
+  }
+  {
+    using v = variant<int&>;
+    static int data = 3;
+    constexpr v x(data);
+    static_assert(rust::visit<FromReference>(first_ref, x) == &data);
+  }
+  {
+    using v = variant<int&, const long&, float>;
+    static int data1 = 3;
+    static long data2 = 4;
+    constexpr float data3 = 5.f;
+    constexpr v x1(data1), x2(data2), x3(data3);
+    static_assert(rust::visit<int>(arity, x1, x2, x3) == 3);
+    static_assert(rust::visit<double>(arity, x1, x2, x3) == 3.0);
   }
 }
 
@@ -637,6 +785,71 @@ TEST(VariantTestReturnVisit, ImmobileFunction) {
     EXPECT_DOUBLE_EQ(
         rust::visit<double>(std::move(std::as_const(visitor)), v {1.414}),
         1.414);
+  }
+}
+
+TEST(VariantTestVisit, VisitReference) {
+  {
+    using v = variant<int&>;
+    int data = 3;
+    v x(data);
+    rust::visit<void>([](auto& ref) { ref = 4; }, x);
+    EXPECT_EQ(rust::visit<double>(
+                  [](auto& ref) {
+                    ref = 4;
+                    return ref;
+                  },
+                  x),
+              4.0);
+    EXPECT_EQ(data, 4);
+  }
+  {
+    using v = variant<float&, double&, int>;
+    struct Visitor {
+      int operator()(float& arg) const {
+        arg = 4.f;
+        return 1;
+      }
+
+      int operator()(double& arg) const {
+        arg = 5.0;
+        return 2;
+      }
+
+      int operator()(int& arg) const {
+        arg = 6;
+        return 3;
+      }
+    };
+
+    float data1 = 1.f;
+    double data2 = 2.0;
+    int data3 = 3;
+    v x1(data1), x2(data2), x3(data3);
+    rust::visit<void>(Visitor(), x1);
+    rust::visit<void>(Visitor(), x2);
+    rust::visit<void>(Visitor(), x3);
+    EXPECT_FLOAT_EQ(data1, 4.f);
+    EXPECT_DOUBLE_EQ(data2, 5.0);
+    EXPECT_EQ(data3, 3);
+
+    data1 = 1.f;
+    data2 = 2.0;
+    data3 = 3;
+    EXPECT_DOUBLE_EQ(rust::visit<double>(Visitor(), x1), 1.0);
+    EXPECT_DOUBLE_EQ(rust::visit<double>(Visitor(), x2), 2.0);
+    EXPECT_EQ(rust::visit<long>(Visitor(), x3), 3l);
+    EXPECT_FLOAT_EQ(data1, 4.f);
+    EXPECT_DOUBLE_EQ(data2, 5.0);
+    EXPECT_EQ(data3, 3);
+  }
+  {
+    using v = variant<int&, double&>;
+    int data = 3;
+    v x(data);
+    EXPECT_EQ(rust::visit<void*>(
+                  [](auto& ref) -> auto{ return &ref; }, x),
+              &data);
   }
 }
 

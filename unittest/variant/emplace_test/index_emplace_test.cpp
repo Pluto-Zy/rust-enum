@@ -27,6 +27,23 @@ TEST(VariantTestIndexEmplace, Deleted) {
   static_assert(!has_index_emplace<v, 3>::value);
 
   static_assert(has_index_emplace<variant<non_convertible>, 0, int>::value);
+
+  static_assert(has_index_emplace<variant<int&>, 0, int&>::value);
+  static_assert(!has_index_emplace<variant<int&>, 0, int>::value);
+  static_assert(!has_index_emplace<variant<int&>, 0, short&>::value);
+  static_assert(has_index_emplace<variant<int&, int&>, 0, int&>::value);
+  static_assert(has_index_emplace<variant<int&, int&>, 1, int&>::value);
+  static_assert(has_index_emplace<variant<int&, int>, 0, int&>::value);
+  static_assert(has_index_emplace<variant<int&, int>, 1, int&>::value);
+  static_assert(!has_index_emplace<variant<int&>, 0, const int&>::value);
+  static_assert(has_index_emplace<variant<const int&>, 0, const int&>::value);
+  static_assert(has_index_emplace<variant<const int&>, 0, int&>::value);
+  static_assert(!has_index_emplace<variant<const int&>, 0, short&>::value);
+  static_assert(has_index_emplace<variant<long&, int&>, 0, long&>::value);
+  static_assert(!has_index_emplace<variant<long&, int&>, 1, long&>::value);
+  static_assert(has_index_emplace<variant<long&, int>, 1, long&>::value);
+  static_assert(!has_index_emplace<variant<int&, std::string&>, 1,
+                                   const char(&)[3]>::value);
 }
 
 TEST(VariantTestIndexEmplace, BasicBehavior) {
@@ -93,6 +110,13 @@ TEST(VariantTestIndexEmplace, BasicBehavior) {
       x.emplace<0>();
       EXPECT_EQ(x.index(), 0);
       EXPECT_EQ(counter::alive_count, 0);
+      x.emplace<1>();
+      EXPECT_EQ(x.index(), 1);
+      EXPECT_EQ(counter::alive_count, 1);
+      EXPECT_EQ(counter::copy_construct_count, 0);
+      EXPECT_EQ(counter::move_construct_count, 0);
+      EXPECT_EQ(counter::copy_assign_count, 0);
+      EXPECT_EQ(counter::move_assign_count, 0);
       counter::reset();
     }
     {
@@ -102,6 +126,20 @@ TEST(VariantTestIndexEmplace, BasicBehavior) {
       x.emplace<1>();
       EXPECT_EQ(x.index(), 1);
       EXPECT_EQ(counter::alive_count, 1);
+      EXPECT_EQ(counter::copy_construct_count, 0);
+      EXPECT_EQ(counter::move_construct_count, 0);
+      EXPECT_EQ(counter::copy_assign_count, 0);
+      EXPECT_EQ(counter::move_assign_count, 0);
+      x.emplace<1>();
+      EXPECT_EQ(x.index(), 1);
+      EXPECT_EQ(counter::alive_count, 1);
+      EXPECT_EQ(counter::copy_construct_count, 0);
+      EXPECT_EQ(counter::move_construct_count, 0);
+      EXPECT_EQ(counter::copy_assign_count, 0);
+      EXPECT_EQ(counter::move_assign_count, 0);
+      x.emplace<0>();
+      EXPECT_EQ(x.index(), 0);
+      EXPECT_EQ(counter::alive_count, 0);
       EXPECT_EQ(counter::copy_construct_count, 0);
       EXPECT_EQ(counter::move_construct_count, 0);
       EXPECT_EQ(counter::copy_assign_count, 0);
@@ -177,6 +215,66 @@ TEST(VariantTestIndexEmplace, BasicBehavior) {
     EXPECT_EQ(x.index(), 0);
     EXPECT_FALSE(get<0>(x).dtor);
   }
+  {
+    using v = variant<int&>;
+    int data1 = 3, data2 = 4;
+    v x = data1;
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(&get<0>(x), &data1);
+    get<0>(x) = 5;
+    EXPECT_EQ(data1, 5);
+    x.emplace<0>(data2);
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(&get<0>(x), &data2);
+    get<0>(x) = 6;
+    EXPECT_EQ(data1, 5);
+    EXPECT_EQ(data2, 6);
+  }
+  {
+    using v = variant<const int&, int&>;
+    int data1 = 3, data2 = 4;
+    v x(std::in_place_index<0>, data1);
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(&get<0>(x), &data1);
+    x.emplace<1>(data2);
+    EXPECT_EQ(x.index(), 1);
+    EXPECT_EQ(&get<1>(x), &data2);
+    x.emplace<0>(data2);
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(&get<0>(x), &data2);
+  }
+  {
+    using v = variant<int&, int>;
+    int data1 = 3, data2 = 4;
+    v x(std::in_place_index<1>, data1);
+    EXPECT_EQ(x.index(), 1);
+    EXPECT_NE(&get<1>(x), &data1);
+    x.emplace<0>(data2);
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(&get<0>(x), &data2);
+    x.emplace<1>(data2);
+    EXPECT_EQ(x.index(), 1);
+    EXPECT_NE(&get<1>(x), &data2);
+  }
+  {
+    using v = variant<int&, long&, const int>;
+    int data1 = 3;
+    long data2 = 4;
+    v x(std::in_place_index<2>, data1);
+    EXPECT_EQ(x.index(), 2);
+    EXPECT_NE(&get<2>(x), &data1);
+    x.emplace<0>(data1);
+    EXPECT_EQ(x.index(), 0);
+    EXPECT_EQ(&get<0>(x), &data1);
+    get<0>(x) = 5;
+    EXPECT_EQ(data1, 5);
+    x.emplace<1>(data2);
+    EXPECT_EQ(x.index(), 1);
+    EXPECT_EQ(&get<1>(x), &data2);
+    get<1>(x) = 6;
+    EXPECT_EQ(data1, 5);
+    EXPECT_EQ(data2, 6);
+  }
 }
 
 #ifdef USE_CXX20
@@ -237,6 +335,19 @@ TEST(VariantTestIndexEmplace, Noexcept) {
   static_assert(has_noexcept_emplace_v<variant<int, long, int*>, 2, int*>);
   static_assert(
       has_noexcept_emplace_v<variant<int, long, int*>, 2, std::nullptr_t>);
+
+  static_assert(has_noexcept_emplace_v<variant<int&>, 0, int&>);
+  static_assert(has_noexcept_emplace_v<variant<int&, int&>, 0, int&>);
+  static_assert(has_noexcept_emplace_v<variant<int&, int&>, 1, int&>);
+  static_assert(has_noexcept_emplace_v<variant<long&, int&>, 0, long&>);
+  static_assert(has_noexcept_emplace_v<variant<int, int&>, 0, int&>);
+  static_assert(has_noexcept_emplace_v<variant<int, int&>, 1, int&>);
+  static_assert(has_noexcept_emplace_v<variant<long&, int>, 0, long&>);
+  static_assert(has_noexcept_emplace_v<variant<long&, int>, 1, long&>);
+  static_assert(has_noexcept_emplace_v<variant<int&, std::string const&>, 1,
+                                       std::string&>);
+  static_assert(
+      has_noexcept_emplace_v<variant<int&, const int&>, 1, const int&>);
 
   {
     struct may_throw_constructible {

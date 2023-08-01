@@ -12,6 +12,13 @@ TEST(VariantTestCopyAssignment, Deleted) {
   static_assert(std::is_copy_assignable<variant<monostate>>::value);
   static_assert(std::is_copy_assignable<variant<int, monostate>>::value);
 
+  static_assert(std::is_copy_assignable<variant<int&>>::value);
+  static_assert(std::is_copy_assignable<variant<int&, int&>>::value);
+  static_assert(std::is_copy_assignable<variant<const int&>>::value);
+  static_assert(std::is_copy_assignable<variant<int&, int>>::value);
+  static_assert(!std::is_copy_assignable<variant<int&, const int>>::value);
+  static_assert(std::is_copy_assignable<variant<int&, const int&>>::value);
+
   struct copy_only {
     copy_only(const copy_only&) = default;
     copy_only(copy_only&&) = delete;
@@ -28,6 +35,8 @@ TEST(VariantTestCopyAssignment, Deleted) {
   };
   static_assert(
       !std::is_copy_assignable<variant<int, copy_construct_only>>::value);
+  static_assert(
+      std::is_copy_assignable<variant<int, copy_construct_only&>>::value);
 
   struct copy_assign_only {
     copy_assign_only(const copy_assign_only&) = delete;
@@ -37,6 +46,8 @@ TEST(VariantTestCopyAssignment, Deleted) {
   };
   static_assert(
       !std::is_copy_assignable<variant<int, copy_assign_only>>::value);
+  static_assert(
+      std::is_copy_assignable<variant<int, copy_assign_only&>>::value);
 
   struct non_copyable {
     non_copyable(const non_copyable&) = delete;
@@ -45,6 +56,7 @@ TEST(VariantTestCopyAssignment, Deleted) {
     non_copyable& operator=(non_copyable&&) = default;
   };
   static_assert(!std::is_copy_assignable<variant<int, non_copyable>>::value);
+  static_assert(std::is_copy_assignable<variant<int, non_copyable&>>::value);
 }
 
 TEST(VariantTestCopyAssignment, Trivial) {
@@ -53,6 +65,12 @@ TEST(VariantTestCopyAssignment, Trivial) {
   static_assert(std::is_trivially_copy_assignable<variant<monostate>>::value);
   static_assert(
       std::is_trivially_copy_assignable<variant<int, monostate>>::value);
+
+  static_assert(std::is_trivially_copy_assignable<variant<int&>>::value);
+  static_assert(std::is_trivially_copy_assignable<variant<int const&>>::value);
+  static_assert(
+      std::is_trivially_copy_assignable<variant<int&, float&>>::value);
+  static_assert(std::is_trivially_copy_assignable<variant<int&, float>>::value);
 
   struct trivially_copyable {
     trivially_copyable(const trivially_copyable&) = default;
@@ -76,6 +94,11 @@ TEST(VariantTestCopyAssignment, Trivial) {
                 variant<int, non_trivially_copy_constructible>>::value);
   static_assert(std::is_copy_assignable<
                 variant<int, non_trivially_copy_constructible>>::value);
+  static_assert(std::is_trivially_copy_assignable<
+                variant<int, non_trivially_copy_constructible&>>::value);
+  static_assert(!std::is_trivially_copy_assignable<
+                variant<int, non_trivially_copy_constructible,
+                        non_trivially_copy_constructible&>>::value);
 
   struct non_trivially_copy_assignable {
     non_trivially_copy_assignable(const non_trivially_copy_assignable&) =
@@ -93,6 +116,11 @@ TEST(VariantTestCopyAssignment, Trivial) {
                 variant<int, non_trivially_copy_assignable>>::value);
   static_assert(std::is_copy_assignable<
                 variant<int, non_trivially_copy_assignable>>::value);
+  static_assert(std::is_trivially_copy_assignable<
+                variant<int, non_trivially_copy_assignable&>>::value);
+  static_assert(!std::is_trivially_copy_assignable<
+                variant<int, non_trivially_copy_assignable,
+                        non_trivially_copy_assignable&>>::value);
 
   struct non_trivially_destructible {
     non_trivially_destructible(const non_trivially_destructible&) = default;
@@ -107,6 +135,11 @@ TEST(VariantTestCopyAssignment, Trivial) {
                 variant<int, non_trivially_destructible>>::value);
   static_assert(
       std::is_copy_assignable<variant<int, non_trivially_destructible>>::value);
+  static_assert(std::is_trivially_copy_assignable<
+                variant<int, non_trivially_destructible&>>::value);
+  static_assert(!std::is_trivially_copy_assignable<
+                variant<int, non_trivially_destructible,
+                        non_trivially_destructible&>>::value);
 
   struct trivially_copy_assignable_non_trivially_moveable {
     trivially_copy_assignable_non_trivially_moveable(
@@ -123,6 +156,9 @@ TEST(VariantTestCopyAssignment, Trivial) {
   static_assert(
       std::is_trivially_copy_assignable<variant<
           int, trivially_copy_assignable_non_trivially_moveable>>::value);
+  static_assert(
+      std::is_trivially_copy_assignable<variant<
+          int, trivially_copy_assignable_non_trivially_moveable&>>::value);
 }
 
 TEST(VariantTestCopyAssignment, Noexcept) {
@@ -131,6 +167,11 @@ TEST(VariantTestCopyAssignment, Noexcept) {
   static_assert(std::is_nothrow_copy_assignable<variant<monostate>>::value);
   static_assert(
       std::is_nothrow_copy_assignable<variant<int, monostate>>::value);
+
+  static_assert(std::is_nothrow_copy_assignable<variant<int&>>::value);
+  static_assert(std::is_nothrow_copy_assignable<variant<int const&>>::value);
+  static_assert(std::is_nothrow_copy_assignable<variant<int&, float&>>::value);
+  static_assert(std::is_nothrow_copy_assignable<variant<int&, double>>::value);
 
   struct nothrow_copyable {
     nothrow_copyable(const nothrow_copyable&) noexcept = default;
@@ -148,6 +189,11 @@ TEST(VariantTestCopyAssignment, Noexcept) {
   };
   static_assert(!std::is_nothrow_copy_assignable<
                 variant<int, throw_copy_constructible>>::value);
+  static_assert(std::is_nothrow_copy_assignable<
+                variant<int, throw_copy_constructible&>>::value);
+  static_assert(
+      !std::is_nothrow_copy_assignable<variant<
+          int, throw_copy_constructible, throw_copy_constructible&>>::value);
 
   struct throw_copy_assignable {
     throw_copy_assignable(const throw_copy_assignable&) noexcept = default;
@@ -155,6 +201,11 @@ TEST(VariantTestCopyAssignment, Noexcept) {
   };
   static_assert(!std::is_nothrow_copy_assignable<
                 variant<int, throw_copy_assignable>>::value);
+  static_assert(std::is_nothrow_copy_assignable<
+                variant<int, throw_copy_assignable&>>::value);
+  static_assert(
+      !std::is_nothrow_copy_assignable<
+          variant<int, throw_copy_assignable, throw_copy_assignable&>>::value);
 
   struct throw_copyable {
     throw_copyable(const throw_copyable&);
@@ -162,6 +213,10 @@ TEST(VariantTestCopyAssignment, Noexcept) {
   };
   static_assert(
       !std::is_nothrow_copy_assignable<variant<int, throw_copyable>>::value);
+  static_assert(
+      std::is_nothrow_copy_assignable<variant<int, throw_copyable&>>::value);
+  static_assert(!std::is_nothrow_copy_assignable<
+                variant<int, throw_copyable, throw_copyable&>>::value);
 }
 
 TEST(VariantTestCopyAssignment, BasicBehavior) {
@@ -429,6 +484,65 @@ TEST(VariantTestCopyAssignment, BasicBehavior) {
     EXPECT_EQ(x1.index(), 0);
     EXPECT_EQ(x2.index(), 1);
     EXPECT_EQ(get<0>(x1), 4);
+  }
+  {
+    using v = variant<int&>;
+    int val1 = 3, val2 = 4;
+    v x1 = val1;
+    EXPECT_EQ(&get<0>(x1), &val1);
+    v x2 = val2;
+    EXPECT_EQ(&get<0>(x2), &val2);
+
+    x1 = x2;
+    EXPECT_EQ(&get<0>(x1), &val2);
+    EXPECT_EQ(&get<0>(x2), &val2);
+  }
+  {
+    using v = variant<int&, float&>;
+    int val1 = 3;
+    float val2 = 4;
+    v x1 = val1;
+    EXPECT_EQ(&get<0>(x1), &val1);
+    v x2 = val2;
+    EXPECT_EQ(&get<1>(x2), &val2);
+
+    x1 = x2;
+    EXPECT_EQ(&get<1>(x1), &val2);
+    EXPECT_EQ(&get<1>(x2), &val2);
+  }
+  {
+    using v = variant<int, float&>;
+    int val1 = 3;
+    float val2 = 4;
+    v x1 = val1;
+    EXPECT_NE(&get<0>(x1), &val1);
+    val1 = 5;
+    EXPECT_EQ(get<0>(x1), 3);
+    v x2 = val2;
+    EXPECT_EQ(&get<1>(x2), &val2);
+
+    x1 = x2;
+    EXPECT_EQ(&get<1>(x1), &val2);
+    EXPECT_EQ(&get<1>(x2), &val2);
+  }
+  {
+    using v = variant<counter&, int>;
+    counter c;
+    v x1 = 3, x2 = c;
+    EXPECT_EQ(counter::alive_count, 1);
+    EXPECT_EQ(counter::copy_construct_count, 0);
+    EXPECT_EQ(counter::copy_assign_count, 0);
+    EXPECT_EQ(counter::move_construct_count, 0);
+    EXPECT_EQ(counter::move_assign_count, 0);
+    x1 = x2;
+    EXPECT_EQ(&get<0>(x1), &c);
+    EXPECT_EQ(&get<0>(x2), &c);
+    EXPECT_EQ(counter::alive_count, 1);
+    EXPECT_EQ(counter::copy_construct_count, 0);
+    EXPECT_EQ(counter::copy_assign_count, 0);
+    EXPECT_EQ(counter::move_construct_count, 0);
+    EXPECT_EQ(counter::move_assign_count, 0);
+    counter::reset();
   }
 }
 

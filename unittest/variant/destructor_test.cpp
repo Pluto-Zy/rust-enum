@@ -5,8 +5,15 @@ namespace rust {
 namespace {
 TEST(VariantTestDestructor, Trivial) {
   static_assert(std::is_trivially_destructible<variant<int>>::value);
+  static_assert(std::is_trivially_destructible<variant<const int>>::value);
   static_assert(std::is_trivially_destructible<variant<int, long>>::value);
   static_assert(std::is_trivially_destructible<variant<int, int>>::value);
+  static_assert(std::is_trivially_destructible<variant<int&>>::value);
+  static_assert(std::is_trivially_destructible<variant<int const&>>::value);
+  static_assert(std::is_trivially_destructible<variant<int&, double&>>::value);
+  static_assert(std::is_trivially_destructible<variant<std::string&>>::value);
+  static_assert(!std::is_trivially_destructible<
+                variant<std::string&, std::string>>::value);
 
   {
     struct trivially_destructible {
@@ -19,6 +26,8 @@ TEST(VariantTestDestructor, Trivial) {
                   variant<int, trivially_destructible>>::value);
     static_assert(!std::is_trivially_destructible<
                   variant<int, int, trivially_destructible>>::value);
+    static_assert(std::is_trivially_destructible<
+                  variant<trivially_destructible&>>::value);
   }
   {
     struct non_trivially_destructible {
