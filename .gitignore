@@ -1,3 +1,13 @@
 .idea
+.vs
+
+# often used by CLion
 cmake-build-debug
 cmake-build-release
+
+# for VSCode
+build
+
+# for Visual Studio
+out
+CMakeSettings.json
