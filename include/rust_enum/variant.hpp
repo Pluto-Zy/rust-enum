@@ -1,11 +1,14 @@
 #ifndef RUST_ENUM_VARIANT_HPP
 #define RUST_ENUM_VARIANT_HPP
 
+#include <algorithm>
 #include <array>
+#include <climits>
 #include <cstdint>
 #include <exception>
 #include <functional>
 #include <initializer_list>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <tuple>
@@ -101,6 +104,32 @@ struct CXX20_DEPRECATE_VOLATILE variant_size<const volatile Ty>
 template <class Ty>
 inline constexpr std::size_t variant_size_v = variant_size<Ty>::value;
 
+struct monostate { };
+
+CONSTEXPR17 bool operator==(monostate, monostate) noexcept {
+  return true;
+}
+
+CONSTEXPR17 bool operator!=(monostate, monostate) noexcept {
+  return false;
+}
+
+CONSTEXPR17 bool operator<(monostate, monostate) noexcept {
+  return false;
+}
+
+CONSTEXPR17 bool operator>(monostate, monostate) noexcept {
+  return false;
+}
+
+CONSTEXPR17 bool operator<=(monostate, monostate) noexcept {
+  return true;
+}
+
+CONSTEXPR17 bool operator>=(monostate, monostate) noexcept {
+  return true;
+}
+
 /**
  * Defines the processing strategy when the variant will become valueless.
  */
@@ -194,13 +223,34 @@ struct remove_cvref : std::remove_cv<typename std::remove_reference<Ty>::type> {
 };
 #endif
 
+template <class Ty,
+          bool = std::is_class<Ty>::value && !std::is_final<Ty>::value>
+struct is_empty_type_impl {
+  int dummy;
+};
+
 template <class Ty>
-class variant_alternative_storage : public traits<Ty> {
+struct is_empty_type_impl<Ty, true> : Ty { };
+
+template <class Ty>
+struct is_empty_type
+    : std::disjunction<
+          std::is_void<Ty>,
+          std::bool_constant<sizeof(is_empty_type_impl<Ty>) == 1>> { };
+
+template <class Ty>
+struct variant_alternative_storage : public traits<Ty> {
   using self = variant_alternative_storage;
   typename std::remove_const<Ty>::type value;
 
-public:
   using value_type = Ty;
+  static constexpr std::size_t storage_size = [] {
+    if constexpr (is_empty_type<Ty>::value) {
+      return 0;
+    } else {
+      return sizeof(Ty);
+    }
+  }();
 
   template <class Self = self,
             typename std::enable_if<Self::is_default_constructible::value,
@@ -279,11 +329,11 @@ struct is_nothrow_reference_constructible<
               std::declval<Arg>()))> { };
 
 template <class Ty>
-class variant_alternative_storage<Ty&> : public traits<Ty*> {
+struct variant_alternative_storage<Ty&> : public traits<Ty*> {
   Ty* value;
 
-public:
   using value_type = Ty&;
+  static constexpr std::size_t storage_size = sizeof(Ty*);
 
   // rewrite some traits in the base class
   template <class... Args>
@@ -465,6 +515,306 @@ DESTRUCTIBLE_UNINITIALIZED_UNION_TEMPLATE(
 
 #undef DESTRUCTIBLE_UNINITIALIZED_UNION_TEMPLATE
 
+template <std::size_t Idx, class Union>
+struct variant_element_helper;
+
+template <std::size_t Idx, class... AltStorages>
+struct variant_element_helper<
+    Idx, variant_destructible_uninitialized_union_t<AltStorages...>&> {
+  using raw_type =
+      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
+  using reference_type = variant_alternative_storage<raw_type>&;
+};
+
+template <std::size_t Idx, class... AltStorages>
+struct variant_element_helper<
+    Idx, variant_destructible_uninitialized_union_t<AltStorages...> const&> {
+  using raw_type =
+      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
+  using reference_type = variant_alternative_storage<raw_type> const&;
+};
+
+template <std::size_t Idx, class... AltStorages>
+struct variant_element_helper<
+    Idx, variant_destructible_uninitialized_union_t<AltStorages...>&&> {
+  using raw_type =
+      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
+  using reference_type = variant_alternative_storage<raw_type>&&;
+};
+
+template <std::size_t Idx, class... AltStorages>
+struct variant_element_helper<
+    Idx, variant_destructible_uninitialized_union_t<AltStorages...> const&&> {
+  using raw_type =
+      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
+  using reference_type = variant_alternative_storage<raw_type> const&&;
+};
+
+template <class>
+struct is_specialization_of_variant_destructible_uninitialized_union
+    : std::false_type { };
+
+template <bool IsTriviallyDestructible, class... Tys>
+struct is_specialization_of_variant_destructible_uninitialized_union<
+    variant_destructible_uninitialized_union<IsTriviallyDestructible, Tys...>>
+    : std::true_type { };
+
+/// This function is used to get the pointer to the Idx-th member of the
+/// variant. It is functionally equivalent to the following implementation:
+///
+/// template <std::size_t Idx, class Union,
+///           class Trait = typename std::enable_if<
+///               is_specialization_of_variant_destructible_uninitialized_union<
+///                   typename remove_cvref<Union>::type>::value,
+///               variant_element_helper<Idx, Union&&>>::type>
+/// typename Trait::reference_type
+/// get_variant_content(Union&& _union) noexcept {
+///   return static_cast<typename Trait::reference_type>(
+///       *reinterpret_cast<typename Trait::storage_type*>(&_union));
+/// }
+///
+/// However, we cannot use `reinterpret_cast` in constexpr function.
+template <std::size_t Idx, class Union,
+          class Trait = typename std::enable_if<
+              is_specialization_of_variant_destructible_uninitialized_union<
+                  typename remove_cvref<Union>::type>::value,
+              variant_element_helper<Idx, Union&&>>::type>
+CONSTEXPR17 typename Trait::reference_type
+get_variant_content(Union&& _union) noexcept {
+  if constexpr (Idx == 0) {
+    return std::forward<Union>(_union).value;
+  } else if constexpr (Idx == 1) {
+    return std::forward<Union>(_union).tail.value;
+  } else if constexpr (Idx == 2) {
+    return std::forward<Union>(_union).tail.tail.value;
+  } else if constexpr (Idx == 3) {
+    return std::forward<Union>(_union).tail.tail.tail.value;
+  } else if constexpr (Idx == 4) {
+    return std::forward<Union>(_union).tail.tail.tail.tail.value;
+  } else if constexpr (Idx == 5) {
+    return std::forward<Union>(_union).tail.tail.tail.tail.tail.value;
+  } else if constexpr (Idx == 6) {
+    return std::forward<Union>(_union).tail.tail.tail.tail.tail.tail.value;
+  } else if constexpr (Idx == 7) {
+    return std::forward<Union>(_union).tail.tail.tail.tail.tail.tail.tail.value;
+  } else {
+    return get_variant_content<Idx - 8>(
+        std::forward<Union>(_union).tail.tail.tail.tail.tail.tail.tail.tail);
+  }
+}
+
+/* niche filling optimization */
+
+template <std::size_t SizeInBits>
+struct unsigned_max {
+  static constexpr std::size_t max_bit = sizeof(std::size_t) * CHAR_BIT;
+  static constexpr std::size_t value = [] {
+    if constexpr (SizeInBits >= max_bit) {
+      return (std::numeric_limits<std::size_t>::max)();
+    } else {
+      return (std::size_t(1) << SizeInBits) - 1;
+    }
+  }();
+};
+
+/// Inclusive wrap-around range of valid values, that is, if Start > End, it
+/// represents [Start, MAX], followed by [0, End].
+///
+/// That is, for an i8 primitive, a range of Start = 254 and End = 2 means
+/// following sequence:
+///
+///    254 (-2), 255 (-1), 0, 1, 2
+///
+/// This type comes from the implementation of rustc:
+/// https://github.com/rust-lang/rust/blob/7a5d2d0138d4a3d7d97cad0ca72ab62e938e0b0b/compiler/rustc_abi/src/lib.rs#L950
+template <std::size_t Start, std::size_t End>
+struct wrapping_range {
+  static constexpr std::size_t start = Start;
+  static constexpr std::size_t end = End;
+  using type = wrapping_range;
+};
+
+template <class Ty>
+struct niche {
+  /// Represents the size of type Ty (in bits).
+  static constexpr std::size_t size_in_bits = sizeof(Ty) * CHAR_BIT;
+  /// Represents the range of valid values.
+  using valid_range = wrapping_range<0, unsigned_max<size_in_bits>::value>;
+
+  static constexpr void set_niche(Ty&, std::size_t) { }
+  static constexpr auto is_niche_value(Ty const&) -> bool { return false; }
+  static constexpr auto get_niche(Ty const&) -> std::size_t { return 0; }
+};
+
+template <class Ty>
+struct niche<Ty&> {
+  static constexpr std::size_t size_in_bits = sizeof(Ty*) * CHAR_BIT;
+  using valid_range = wrapping_range<1, unsigned_max<size_in_bits>::value>;
+
+  static constexpr void set_niche(Ty*& target, std::size_t) {
+    target = nullptr;
+  }
+
+  static constexpr auto is_niche_value(Ty* target) -> bool {
+    return target == nullptr;
+  }
+
+  static constexpr auto get_niche(Ty* target) -> std::size_t { return 0; }
+};
+
+template <class... AltStorages>
+struct variant_status_count
+    : std::integral_constant<
+          std::size_t, variant_no_valueless_state<
+                           variant<typename AltStorages::value_type...>>::value
+                           ? sizeof...(AltStorages)
+                           : sizeof...(AltStorages) + 1> { };
+
+template <class... AltStorages>
+class niche_filling_impl {
+  template <class Niche>
+  static constexpr auto available_niche() -> std::size_t {
+    return (Niche::valid_range::start - (Niche::valid_range::end + 1)) &
+           unsigned_max<Niche::size_in_bits>::value;
+  }
+
+  static constexpr auto find_niche_filling_variant() -> std::size_t {
+    constexpr std::size_t no_niche_variant = static_cast<std::size_t>(0) - 1;
+
+    // find the index of the largest alternative
+    constexpr std::size_t storage_sizes[] = {AltStorages::storage_size...};
+    // std::distance and std::max_element are constexpr in C++17
+    constexpr std::size_t largest_storage_index = std::distance(
+        std::begin(storage_sizes),
+        std::max_element(std::begin(storage_sizes), std::end(storage_sizes)));
+    // find the type of the largest alternative
+    using largest_storage_alternative = typename variant_alternative<
+        largest_storage_index,
+        variant<typename AltStorages::value_type...>>::type;
+
+    // We don't yet support using the niche of class members and variant
+    // alternatives. The niche of class types will be set to empty.
+    // If we want to support class types, we should find the member with the
+    // largest niche here. Note that if the member itself also has multiple
+    // members, the niche of the member will be the largest niche of its
+    // members. So we should also save the offset of the member.
+    constexpr std::size_t available =
+        available_niche<niche<largest_storage_alternative>>();
+    constexpr std::size_t status_count =
+        largest_storage_index == 0 ||
+                largest_storage_index == std::size(storage_sizes) - 1
+            ? variant_status_count<AltStorages...>::value - 1
+            : variant_status_count<AltStorages...>::value;
+
+    if (status_count > available) {
+      return no_niche_variant;
+    }
+
+    // Checks whether all the alternatives fit in the niche.
+    for (std::size_t i = 0; i != std::size(storage_sizes); ++i) {
+      if (i == largest_storage_index)
+        continue;
+
+      // Currently we don't implement the niche of class types and variant
+      // types, so the offset of niche is always 0. We also don't implement the
+      // feature that put the alternative after the niche, so we just return
+      // here.
+      if (storage_sizes[i] > 0) {
+        return no_niche_variant;
+      }
+    }
+
+    return largest_storage_index;
+  }
+
+  template <class Niche>
+  static constexpr auto reserve(std::size_t count) -> std::size_t {
+    using valid_range = typename Niche::valid_range;
+    constexpr std::size_t max_value = unsigned_max<Niche::size_in_bits>::value;
+    constexpr std::size_t distance_end_zero = max_value - valid_range::end;
+
+    if (niche_index == 0 || niche_index == sizeof...(AltStorages) - 1) {
+      --count;
+    }
+
+    auto const move_start = [count] {
+      return (valid_range::start - count) & max_value;
+    };
+
+    auto const move_end = [] { return (valid_range::end + 1) & max_value; };
+
+    if (valid_range::start > valid_range::end) {
+      return move_end();
+    } else if (valid_range::start <= distance_end_zero) {
+      if (count <= valid_range::start) {
+        return move_start();
+      } else {
+        return move_end();
+      }
+    } else {
+      std::size_t const end = (valid_range::end + count) & max_value;
+      if (1 <= end && end <= valid_range::end) {
+        return move_start();
+      } else {
+        return move_end();
+      }
+    }
+  }
+
+  struct empty {
+    using type = void;
+  };
+
+  // Note that we cannot use alias template here, because the partial
+  // instantiation of alias template will cause the complete instantiation of
+  // the actual type.
+  template <class Niche, std::size_t StatusCount>
+  struct niche_start_impl
+      : std::integral_constant<std::size_t, reserve<Niche>(StatusCount)> { };
+
+public:
+  static constexpr std::size_t niche_index = find_niche_filling_variant();
+
+  static constexpr bool has_niche_alternative =
+      niche_index != static_cast<std::size_t>(0) - 1;
+
+  using type = typename std::conditional<
+      has_niche_alternative,
+      // We cannot use variant_alternative<index, variant<typename
+      // AltStorages::value_type...>>::type here, because it will request the
+      // complete instantiation of variant_alternative, which may cause
+      // overflow and compilation error.
+      variant_alternative<niche_index,
+                          variant<typename AltStorages::value_type...>>,
+      empty>::type::type;
+
+  static constexpr std::size_t niche_start = std::conditional<
+      has_niche_alternative,
+      // We cannot use std::integral_constant<std::size_t,
+      // reserve<niche<typename niche_alternative::type>>(status_count)> here,
+      // because it will request the complete instantiation of reserve<>(),
+      // which may cause error.
+      niche_start_impl<niche<type>,
+                       variant_status_count<AltStorages...>::value>,
+      std::integral_constant<std::size_t, 0>>::type::value;
+
+  static constexpr std::size_t alt_index_to_niche_index(std::size_t index) {
+    if constexpr (niche_index == 0) {
+      return index - 1 + niche_start;
+    } else {
+      return index + niche_start;
+    }
+  }
+
+  static constexpr std::size_t niche_index_to_alt_index(std::size_t index) {
+    if constexpr (niche_index == 0) {
+      return index - niche_start + 1;
+    } else {
+      return index - niche_start;
+    }
+  }
+};
+
 template <std::size_t StatusCount>
 struct variant_index
     : std::conditional<
@@ -474,8 +824,26 @@ struct variant_index
               StatusCount <= (std::numeric_limits<std::uint16_t>::max)(),
               std::uint16_t, std::uint32_t>::type> { };
 
+/// Represents the status of variant_storage.
+enum class variant_storage_status {
+  /// The normal case. We need to store tags and all alternatives separately.
+  NORMAL,
+  /// When the variant has only one state (status_count is 1), we don't need to
+  /// store the tag. Note that a variant with only one alternative does not
+  /// necessarily have only one state, because it may also have a valueless
+  /// state.
+  ///
+  /// Unimplemented now.
+  SINGLE_ALTERNATIVE,
+  /// Using niche filling optimization to store tags into an alternative.
+  NICHE_FILLING,
+};
+
+template <variant_storage_status Status, class... AltStorages>
+struct variant_storage { };
+
 template <class... AltStorages>
-struct variant_storage {
+struct variant_storage<variant_storage_status::NORMAL, AltStorages...> {
   using storage_t = variant_destructible_uninitialized_union_t<AltStorages...>;
   storage_t _value_storage;
 
@@ -483,16 +851,14 @@ struct variant_storage {
       variant<typename AltStorages::value_type...>>::value;
   // If the current variant will not be valueless, no storage is required for
   // it.
-  // FIXME: Since the template parameter of variant may be modified in the
-  //  future, we must manually construct the variant type here.
   static constexpr std::size_t status_count =
-      no_valueless_state ? sizeof...(AltStorages) : sizeof...(AltStorages) + 1;
+      variant_status_count<AltStorages...>::value;
   using variant_index_t = typename variant_index<status_count>::type;
-  variant_index_t _raw_index;
+  variant_index_t _index;
   // cannot use variant_index_t, which may cause overflow
-  static constexpr std::size_t valueless_raw_index = sizeof...(AltStorages);
+  static constexpr std::size_t valueless_index = status_count - 1;
 
-  CONSTEXPR17 variant_storage() : _value_storage(), _raw_index(0) { }
+  CONSTEXPR17 variant_storage() : _value_storage(), _index(0) { }
 
   template <std::size_t Idx, class... Args>
   CONSTEXPR17 explicit variant_storage(std::in_place_index_t<Idx> _tag,
@@ -500,35 +866,23 @@ struct variant_storage {
       std::is_nothrow_constructible<storage_t, std::in_place_index_t<Idx>,
                                     Args&&...>::value) :
       _value_storage(_tag, std::forward<Args>(args)...),
-      _raw_index(0) {
+      _index(0) {
     set_index(Idx);
   }
 
-  variant_storage(const variant_storage&) = default;
-  variant_storage(variant_storage&&) = default;
-  variant_storage& operator=(const variant_storage&) = default;
-  variant_storage& operator=(variant_storage&&) = default;
-
-  [[nodiscard]] CONSTEXPR17 std::size_t raw_index() const noexcept {
-    return static_cast<std::size_t>(_raw_index);
-  }
   [[nodiscard]] CONSTEXPR17 std::size_t index() const noexcept {
-    // Before implementing niche optimization, raw_index and index are the same.
-    return raw_index();
+    return static_cast<std::size_t>(_index);
   }
-  CONSTEXPR17 void set_raw_index(std::size_t raw_index) noexcept {
-    _raw_index = static_cast<variant_index_t>(raw_index);
-  }
+
   CONSTEXPR17 void set_index(std::size_t index) noexcept {
-    // Before implementing niche optimization, raw_index and index are the same.
-    set_raw_index(index);
+    _index = static_cast<variant_index_t>(index);
   }
 
   [[nodiscard]] CONSTEXPR17 bool valueless_by_exception() const noexcept {
     if constexpr (no_valueless_state)
       return false;
     else
-      return raw_index() == valueless_raw_index;
+      return index() == valueless_index;
   }
 
   CONSTEXPR17 storage_t& value_storage() & noexcept { return _value_storage; }
@@ -581,100 +935,117 @@ struct variant_storage {
   CONSTEXPR17 void clear_to_valueless() noexcept;
 };
 
-template <std::size_t Idx, class Union>
-struct variant_element_helper;
+template <class... AltStorages>
+struct variant_storage<variant_storage_status::NICHE_FILLING, AltStorages...> {
+  using storage_t = variant_destructible_uninitialized_union_t<AltStorages...>;
+  using niche_impl = niche_filling_impl<AltStorages...>;
+  static_assert(niche_impl::has_niche_alternative,
+                "No niche alternative found for the variant.");
+  storage_t _value_storage;
 
-template <std::size_t Idx, class... AltStorages>
-struct variant_element_helper<
-    Idx, variant_destructible_uninitialized_union_t<AltStorages...>&> {
-  using raw_type =
-      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
-  using reference_type = variant_alternative_storage<raw_type>&;
-};
+  static constexpr bool no_valueless_state = variant_no_valueless_state<
+      variant<typename AltStorages::value_type...>>::value;
+  // If the current variant will not be valueless, no storage is required for
+  // it.
+  static constexpr std::size_t status_count =
+      variant_status_count<AltStorages...>::value;
+  // cannot use variant_index_t, which may cause overflow
+  static constexpr std::size_t valueless_index = status_count - 1;
 
-template <std::size_t Idx, class... AltStorages>
-struct variant_element_helper<
-    Idx, variant_destructible_uninitialized_union_t<AltStorages...> const&> {
-  using raw_type =
-      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
-  using reference_type = variant_alternative_storage<raw_type> const&;
-};
+  CONSTEXPR17 variant_storage() : _value_storage() { }
 
-template <std::size_t Idx, class... AltStorages>
-struct variant_element_helper<
-    Idx, variant_destructible_uninitialized_union_t<AltStorages...>&&> {
-  using raw_type =
-      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
-  using reference_type = variant_alternative_storage<raw_type>&&;
-};
-
-template <std::size_t Idx, class... AltStorages>
-struct variant_element_helper<
-    Idx, variant_destructible_uninitialized_union_t<AltStorages...> const&&> {
-  using raw_type =
-      variant_alternative_t<Idx, variant<typename AltStorages::value_type...>>;
-  using reference_type = variant_alternative_storage<raw_type> const&&;
-};
-
-template <class>
-struct is_specialization_of_variant_destructible_uninitialized_union
-    : std::false_type { };
-
-template <bool IsTriviallyDestructible, class... Tys>
-struct is_specialization_of_variant_destructible_uninitialized_union<
-    variant_destructible_uninitialized_union<IsTriviallyDestructible, Tys...>>
-    : std::true_type { };
-
-template <class>
-struct is_specialization_of_variant_storage : std::false_type { };
-
-template <class... Tys>
-struct is_specialization_of_variant_storage<variant_storage<Tys...>>
-    : std::true_type { };
-
-/// This function is used to get the pointer to the Idx-th member of the
-/// variant. It is functionally equivalent to the following implementation:
-///
-/// template <std::size_t Idx, class Union,
-///           class Trait = typename std::enable_if<
-///               is_specialization_of_variant_destructible_uninitialized_union<
-///                   typename remove_cvref<Union>::type>::value,
-///               variant_element_helper<Idx, Union&&>>::type>
-/// typename Trait::reference_type
-/// get_variant_content(Union&& _union) noexcept {
-///   return static_cast<typename Trait::reference_type>(
-///       *reinterpret_cast<typename Trait::storage_type*>(&_union));
-/// }
-///
-/// However, we cannot use `reinterpret_cast` in constexpr function.
-template <std::size_t Idx, class Union,
-          class Trait = typename std::enable_if<
-              is_specialization_of_variant_destructible_uninitialized_union<
-                  typename remove_cvref<Union>::type>::value,
-              variant_element_helper<Idx, Union&&>>::type>
-CONSTEXPR17 typename Trait::reference_type
-get_variant_content(Union&& _union) noexcept {
-  if constexpr (Idx == 0) {
-    return std::forward<Union>(_union).value;
-  } else if constexpr (Idx == 1) {
-    return std::forward<Union>(_union).tail.value;
-  } else if constexpr (Idx == 2) {
-    return std::forward<Union>(_union).tail.tail.value;
-  } else if constexpr (Idx == 3) {
-    return std::forward<Union>(_union).tail.tail.tail.value;
-  } else if constexpr (Idx == 4) {
-    return std::forward<Union>(_union).tail.tail.tail.tail.value;
-  } else if constexpr (Idx == 5) {
-    return std::forward<Union>(_union).tail.tail.tail.tail.tail.value;
-  } else if constexpr (Idx == 6) {
-    return std::forward<Union>(_union).tail.tail.tail.tail.tail.tail.value;
-  } else if constexpr (Idx == 7) {
-    return std::forward<Union>(_union).tail.tail.tail.tail.tail.tail.tail.value;
-  } else {
-    return get_variant_content<Idx - 8>(
-        std::forward<Union>(_union).tail.tail.tail.tail.tail.tail.tail.tail);
+  template <std::size_t Idx, class... Args>
+  CONSTEXPR17 explicit variant_storage(std::in_place_index_t<Idx> _tag,
+                                       Args&&... args) noexcept(  //
+      std::is_nothrow_constructible<storage_t, std::in_place_index_t<Idx>,
+                                    Args&&...>::value) :
+      _value_storage(_tag, std::forward<Args>(args)...) {
+    set_index(Idx);
   }
-}
+
+  [[nodiscard]] CONSTEXPR17 std::size_t index() const noexcept {
+    using valid_range = typename niche<typename niche_impl::type>::valid_range;
+    if constexpr (!(valid_range::start == 0 &&
+                    valid_range::end ==
+                        unsigned_max<niche<
+                            typename niche_impl::type>::size_in_bits>::value)) {
+      auto&& value =
+          get_variant_content<niche_impl::niche_index>(_value_storage).value;
+      if (niche<typename niche_impl::type>::is_niche_value(
+              std::forward<decltype(value)>(value))) {
+        return niche_impl::niche_index_to_alt_index(
+            niche<typename niche_impl::type>::get_niche(
+                std::forward<decltype(value)>(value)));
+      }
+    }
+
+    return niche_impl::niche_index;
+  }
+
+  CONSTEXPR17 void set_index(std::size_t index) noexcept {
+    if (index != niche_impl::niche_index) {
+      niche<typename niche_impl::type>::set_niche(
+          get_variant_content<niche_impl::niche_index>(_value_storage).value,
+          niche_impl::alt_index_to_niche_index(index));
+    }
+  }
+
+  [[nodiscard]] CONSTEXPR17 bool valueless_by_exception() const noexcept {
+    if constexpr (no_valueless_state)
+      return false;
+    else
+      return index() == valueless_index;
+  }
+
+  CONSTEXPR17 storage_t& value_storage() & noexcept { return _value_storage; }
+  CONSTEXPR17 const storage_t& value_storage() const& noexcept {
+    return _value_storage;
+  }
+  CONSTEXPR17 storage_t&& value_storage() && noexcept {
+    return std::move(_value_storage);
+  }
+  CONSTEXPR17 const storage_t&& value_storage() const&& noexcept {
+    return std::move(_value_storage);
+  }
+
+  CONSTEXPR17 variant_storage& storage() & noexcept { return *this; }
+  CONSTEXPR17 const variant_storage& storage() const& noexcept { return *this; }
+  CONSTEXPR17 variant_storage&& storage() && noexcept {
+    return std::move(*this);
+  }
+  CONSTEXPR17 const variant_storage&& storage() const&& noexcept {
+    return std::move(*this);
+  }
+
+  template <std::size_t Idx, class... Args>
+  CONSTEXPR20 void construct_union_alt(Args&&... args) noexcept(
+      std::is_nothrow_constructible<storage_t, std::in_place_index_t<Idx>,
+                                    Args&&...>::value) {
+    (construct_at)(std::addressof(_value_storage), std::in_place_index<Idx>,
+                   std::forward<Args>(args)...);
+    set_index(Idx);
+  }
+
+  template <std::size_t CurIdx, std::size_t TargetIdx, class... Args>
+  CONSTEXPR20 void emplace_alt(Args&&... args);
+
+  template <std::size_t Idx>
+  CONSTEXPR20 void destroy_union_alt() noexcept {
+    _value_storage.template destroy_content<Idx>();
+  }
+
+  template <class Tagged>
+  CONSTEXPR17 void clear(Tagged) noexcept;
+  template <std::size_t Idx>
+  CONSTEXPR17 void clear() noexcept;
+  CONSTEXPR17 void clear() noexcept;
+
+  template <class Tagged>
+  CONSTEXPR17 void clear_to_valueless(Tagged) noexcept;
+  template <std::size_t Idx>
+  CONSTEXPR17 void clear_to_valueless() noexcept;
+  CONSTEXPR17 void clear_to_valueless() noexcept;
+};
 
 struct valueless_tag { };
 
@@ -705,12 +1076,11 @@ struct tagged_reference<Idx, valueless_tag> {
   CONSTEXPR17 valueless_tag forward_content() const { return {}; }
 };
 
-// FIXME: Here `Is` is index, but `valueless_raw_index` is raw_index.
 template <std::size_t Idx, class Storage>
 struct is_valueless
     : std::bool_constant<
           !std::remove_reference<Storage>::type::no_valueless_state &&
-          Idx == std::remove_reference<Storage>::type::status_count - 1> { };
+          Idx == std::remove_reference<Storage>::type::valueless_index> { };
 
 template <std::size_t Idx, class Storage,
           bool = is_valueless<Idx, Storage>::value>
@@ -751,6 +1121,13 @@ public:
 [[noreturn]] inline void throw_bad_variant_access() {
   throw bad_variant_access {};
 }
+
+template <class>
+struct is_specialization_of_variant_storage : std::false_type { };
+
+template <variant_storage_status Status, class... Tys>
+struct is_specialization_of_variant_storage<variant_storage<Status, Tys...>>
+    : std::true_type { };
 
 template <class>
 struct variant_visit_dispatcher;
@@ -1085,20 +1462,24 @@ tagged_visit(Fn&& func, Storages&&... storages) {
 
 template <class... AltStorages>
 template <class Tagged>
-CONSTEXPR17 void variant_storage<AltStorages...>::clear(Tagged) noexcept {
+CONSTEXPR17 void
+variant_storage<variant_storage_status::NORMAL, AltStorages...>::clear(
+    Tagged) noexcept {
   clear<Tagged::index>();
 }
 
 template <class... AltStorages>
 template <std::size_t Idx>
-CONSTEXPR17 void variant_storage<AltStorages...>::clear() noexcept {
+CONSTEXPR17 void variant_storage<variant_storage_status::NORMAL,
+                                 AltStorages...>::clear() noexcept {
   if constexpr (!is_valueless<Idx, variant_storage>::value) {
     destroy_union_alt<Idx>();
   }
 }
 
 template <class... AltStorages>
-CONSTEXPR17 void variant_storage<AltStorages...>::clear() noexcept {
+CONSTEXPR17 void variant_storage<variant_storage_status::NORMAL,
+                                 AltStorages...>::clear() noexcept {
   if constexpr (!std::conjunction<typename AltStorages::
                                       is_trivially_destructible...>::value) {
     tagged_visit([this](auto t) { this->clear(t); }, *this);
@@ -1108,7 +1489,8 @@ CONSTEXPR17 void variant_storage<AltStorages...>::clear() noexcept {
 template <class... AltStorages>
 template <class Tagged>
 CONSTEXPR17 void
-variant_storage<AltStorages...>::clear_to_valueless(Tagged) noexcept {
+variant_storage<variant_storage_status::NORMAL,
+                AltStorages...>::clear_to_valueless(Tagged) noexcept {
   static_assert(
       !variant_storage::no_valueless_state,
       "variant_storage cannot be valueless, please consider using clear().");
@@ -1118,17 +1500,19 @@ variant_storage<AltStorages...>::clear_to_valueless(Tagged) noexcept {
 template <class... AltStorages>
 template <std::size_t Idx>
 CONSTEXPR17 void
-variant_storage<AltStorages...>::clear_to_valueless() noexcept {
+variant_storage<variant_storage_status::NORMAL,
+                AltStorages...>::clear_to_valueless() noexcept {
   static_assert(
       !variant_storage::no_valueless_state,
       "variant_storage cannot be valueless, please consider using clear().");
   clear<Idx>();
-  set_raw_index(valueless_raw_index);
+  set_index(valueless_index);
 }
 
 template <class... AltStorages>
 CONSTEXPR17 void
-variant_storage<AltStorages...>::clear_to_valueless() noexcept {
+variant_storage<variant_storage_status::NORMAL,
+                AltStorages...>::clear_to_valueless() noexcept {
   static_assert(
       !variant_storage::no_valueless_state,
       "variant_storage cannot be valueless, please consider using clear().");
@@ -1136,7 +1520,70 @@ variant_storage<AltStorages...>::clear_to_valueless() noexcept {
                                       is_trivially_destructible...>::value) {
     tagged_visit([this](auto t) { this->clear(t); }, *this);
   }
-  set_raw_index(valueless_raw_index);
+  set_index(valueless_index);
+}
+
+template <class... AltStorages>
+template <class Tagged>
+CONSTEXPR17 void
+variant_storage<variant_storage_status::NICHE_FILLING, AltStorages...>::clear(
+    Tagged) noexcept {
+  clear<Tagged::index>();
+}
+
+template <class... AltStorages>
+template <std::size_t Idx>
+CONSTEXPR17 void variant_storage<variant_storage_status::NICHE_FILLING,
+                                 AltStorages...>::clear() noexcept {
+  if constexpr (!is_valueless<Idx, variant_storage>::value) {
+    destroy_union_alt<Idx>();
+  }
+}
+
+template <class... AltStorages>
+CONSTEXPR17 void variant_storage<variant_storage_status::NICHE_FILLING,
+                                 AltStorages...>::clear() noexcept {
+  if constexpr (!std::conjunction<typename AltStorages::
+                                      is_trivially_destructible...>::value) {
+    tagged_visit([this](auto t) { this->clear(t); }, *this);
+  }
+}
+
+template <class... AltStorages>
+template <class Tagged>
+CONSTEXPR17 void
+variant_storage<variant_storage_status::NICHE_FILLING,
+                AltStorages...>::clear_to_valueless(Tagged) noexcept {
+  static_assert(
+      !variant_storage::no_valueless_state,
+      "variant_storage cannot be valueless, please consider using clear().");
+  clear_to_valueless<Tagged::index>();
+}
+
+template <class... AltStorages>
+template <std::size_t Idx>
+CONSTEXPR17 void
+variant_storage<variant_storage_status::NICHE_FILLING,
+                AltStorages...>::clear_to_valueless() noexcept {
+  static_assert(
+      !variant_storage::no_valueless_state,
+      "variant_storage cannot be valueless, please consider using clear().");
+  clear<Idx>();
+  set_index(valueless_index);
+}
+
+template <class... AltStorages>
+CONSTEXPR17 void
+variant_storage<variant_storage_status::NICHE_FILLING,
+                AltStorages...>::clear_to_valueless() noexcept {
+  static_assert(
+      !variant_storage::no_valueless_state,
+      "variant_storage cannot be valueless, please consider using clear().");
+  if constexpr (!std::conjunction<typename AltStorages::
+                                      is_trivially_destructible...>::value) {
+    tagged_visit([this](auto t) { this->clear(t); }, *this);
+  }
+  set_index(valueless_index);
 }
 
 /**
@@ -1148,8 +1595,10 @@ variant_storage<AltStorages...>::clear_to_valueless() noexcept {
 template <class Storage>
 struct can_fall_back : std::false_type { };
 
-template <class HeadAltStorage, class... TailAltStorages>
-struct can_fall_back<variant_storage<HeadAltStorage, TailAltStorages...>>
+template <variant_storage_status Status, class HeadAltStorage,
+          class... TailAltStorages>
+struct can_fall_back<
+    variant_storage<Status, HeadAltStorage, TailAltStorages...>>
     : HeadAltStorage::is_nothrow_default_constructible { };
 
 template <class Storage>
@@ -1165,7 +1614,9 @@ struct variant_fall_back_guard {
 
 template <class... AltStorages>
 template <std::size_t CurIdx, std::size_t TargetIdx, class... Args>
-CONSTEXPR20 void variant_storage<AltStorages...>::emplace_alt(Args&&... args) {
+CONSTEXPR20 void
+variant_storage<variant_storage_status::NORMAL, AltStorages...>::emplace_alt(
+    Args&&... args) {
   using variant_type = variant<typename AltStorages::value_type...>;
   using target_type = variant_alternative_t<TargetIdx, variant_type>;
   using storage_type = variant_alternative_storage<target_type>;
@@ -1189,9 +1640,11 @@ CONSTEXPR20 void variant_storage<AltStorages...>::emplace_alt(Args&&... args) {
   } else {
     if constexpr (variant_valueless_strategy<variant_type>::value ==
                   variant_valueless_strategy_t::FALLBACK) {
-      static_assert(can_fall_back<variant_storage<AltStorages...>>::value,
-                    "When using the FALL_BACK strategy, the first member of "
-                    "the variant must be default-constructible.");
+      static_assert(
+          can_fall_back<variant_storage<variant_storage_status::NORMAL,
+                                        AltStorages...>>::value,
+          "When using the FALL_BACK strategy, the first member of the variant "
+          "must be default-constructible.");
 
       this->template clear<CurIdx>();
       variant_fall_back_guard<
@@ -1214,10 +1667,70 @@ CONSTEXPR20 void variant_storage<AltStorages...>::emplace_alt(Args&&... args) {
 }
 
 template <class... AltStorages>
+template <std::size_t CurIdx, std::size_t TargetIdx, class... Args>
+CONSTEXPR20 void variant_storage<variant_storage_status::NICHE_FILLING,
+                                 AltStorages...>::emplace_alt(Args&&... args) {
+  using variant_type = variant<typename AltStorages::value_type...>;
+  using target_type = variant_alternative_t<TargetIdx, variant_type>;
+  using storage_type = variant_alternative_storage<target_type>;
+
+  if constexpr (std::is_nothrow_constructible<storage_type, Args&&...>::value) {
+    // We must test the property of variant_alternative_storage here, because
+    // Args can also be variant_alternative_storage.
+    this->template clear<CurIdx>();
+    this->template construct_union_alt<TargetIdx>(std::forward<Args>(args)...);
+  } else if constexpr (storage_type::is_nothrow_move_constructible::value) {
+    // We must test the property of the actual value_type of
+    // variant_alternative_storage here, see the comment of
+    // variant_assign_visitor_impl.
+    static_assert(std::is_nothrow_move_constructible<storage_type>::value,
+                  "Internal error: the value stored in "
+                  "variant_alternative_storage is nothrow-move-constructible, "
+                  "while variant_alternative_storage itself is not.");
+    storage_type _temp(std::forward<Args>(args)...);
+    this->template clear<CurIdx>();
+    this->template construct_union_alt<TargetIdx>(std::move(_temp));
+  } else {
+    if constexpr (variant_valueless_strategy<variant_type>::value ==
+                  variant_valueless_strategy_t::FALLBACK) {
+      static_assert(
+          can_fall_back<variant_storage<variant_storage_status::NORMAL,
+                                        AltStorages...>>::value,
+          "When using the FALL_BACK strategy, the first member of "
+          "the variant must be default-constructible.");
+
+      this->template clear<CurIdx>();
+      variant_fall_back_guard<
+          typename std::remove_reference<decltype(this->storage())>::type>
+          _guard {&this->storage()};
+      this->template construct_union_alt<TargetIdx>(
+          std::forward<Args>(args)...);
+      _guard.target = nullptr;
+    } else {
+      if constexpr (variant_valueless_strategy<variant_type>::value ==
+                    variant_valueless_strategy_t::LET_VARIANT_DECIDE) {
+        this->template clear_to_valueless<CurIdx>();
+      } else {
+        this->template clear<CurIdx>();
+      }
+      this->template construct_union_alt<TargetIdx>(
+          std::forward<Args>(args)...);
+    }
+  }
+}
+
+template <class... AltStorages>
+using variant_storage_selector =
+    variant_storage<niche_filling_impl<AltStorages...>::has_niche_alternative
+                        ? variant_storage_status::NICHE_FILLING
+                        : variant_storage_status::NORMAL,
+                    AltStorages...>;
+
+template <class... AltStorages>
 struct variant_non_trivially_destructible_storage
-    : variant_storage<AltStorages...> {
+    : variant_storage_selector<AltStorages...> {
   using self = variant_non_trivially_destructible_storage;
-  using base = variant_storage<AltStorages...>;
+  using base = variant_storage_selector<AltStorages...>;
   using base::base;
 
   variant_non_trivially_destructible_storage() = default;
@@ -1232,12 +1745,12 @@ struct variant_non_trivially_destructible_storage
 template <class... AltStorages>
 using variant_destructible_storage_t = typename std::conditional<
     std::conjunction<typename AltStorages::is_trivially_destructible...>::value,
-    variant_storage<AltStorages...>,
+    variant_storage_selector<AltStorages...>,
     variant_non_trivially_destructible_storage<AltStorages...>>::type;
 
 template <class... AltStorages>
 struct variant_construct_visitor {
-  variant_storage<AltStorages...>& self;
+  variant_storage_selector<AltStorages...>& self;
 
   template <std::size_t Idx, class AltStorageRef>
   CONSTEXPR17 void
@@ -1355,7 +1868,7 @@ using variant_move_constructible_storage_t = typename std::conditional<
 /// variant_alternative_storage.
 template <std::size_t OtherIdx, class OtherTy, class... TargetAltStorages>
 struct variant_assign_visitor_impl {
-  variant_storage<TargetAltStorages...>& self;
+  variant_storage_selector<TargetAltStorages...>& self;
   tagged_reference<OtherIdx, OtherTy> source;
 
   template <std::size_t SelfIdx, class SelfAltStorageRef>
@@ -1410,7 +1923,7 @@ struct variant_assign_visitor_impl {
 
 template <class... AltStorages>
 struct variant_assign_visitor {
-  variant_storage<AltStorages...>& self;
+  variant_storage_selector<AltStorages...>& self;
 
   template <std::size_t SelfIdx, class SelfAltStorageRef, std::size_t OtherIdx,
             class OtherAltStorageRef>
@@ -1906,13 +2419,14 @@ struct single_visit_return_type;
 template <class Fn, std::size_t... Is, class... Storages>
 struct single_visit_return_type<Fn, std::index_sequence<Is...>, Storages...>
     : std::invoke_result<
-          Fn&&, decltype(get_variant_tagged_content<(
-                             std::remove_reference<
-                                     Storages>::type::valueless_raw_index == Is
-                                 ? 0
-                                 : Is)>(std::declval<Storages>())
-                             .forward_content()
-                             .forward_value())...> { };
+          Fn&&,
+          decltype(get_variant_tagged_content<(
+                       std::remove_reference<Storages>::type::valueless_index ==
+                               Is
+                           ? 0
+                           : Is)>(std::declval<Storages>())
+                       .forward_content()
+                       .forward_value())...> { };
 
 template <class Fn, template <class...> class check_trait, class CheckBase,
           class... IndexSequences, class... Storages>
@@ -2209,32 +2723,6 @@ template <
 CONSTEXPR20 void swap(variant<Tys...>& lhs,
                       variant<Tys...>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
   lhs.swap(rhs);
-}
-
-struct monostate { };
-
-CONSTEXPR17 bool operator==(monostate, monostate) noexcept {
-  return true;
-}
-
-CONSTEXPR17 bool operator!=(monostate, monostate) noexcept {
-  return false;
-}
-
-CONSTEXPR17 bool operator<(monostate, monostate) noexcept {
-  return false;
-}
-
-CONSTEXPR17 bool operator>(monostate, monostate) noexcept {
-  return false;
-}
-
-CONSTEXPR17 bool operator<=(monostate, monostate) noexcept {
-  return true;
-}
-
-CONSTEXPR17 bool operator>=(monostate, monostate) noexcept {
-  return true;
 }
 
 }  // namespace rust
