@@ -74,13 +74,15 @@ TEST(VariantTestVisit, ForwardCallOperator) {
         using v = variant<int, long, double, std::string>;
         v x1(3l), x2("hello"), x3(4), x4(1.1);
         rust::visit(obj, x1, x2, x3, x4);
-        EXPECT_TRUE((fn::check_call<long&, std::string&, int&, double&>(CT_NON_CONST | CT_LVALUE))
-        );
+        EXPECT_TRUE((  //
+            fn::check_call<long&, std::string&, int&, double&>(CT_NON_CONST | CT_LVALUE)
+        ));
         rust::visit(cobj, x1, x2, x3, x4);
         EXPECT_TRUE((fn::check_call<long&, std::string&, int&, double&>(CT_CONST | CT_LVALUE)));
         rust::visit(std::move(obj), x1, x2, x3, x4);
-        EXPECT_TRUE((fn::check_call<long&, std::string&, int&, double&>(CT_NON_CONST | CT_RVALUE))
-        );
+        EXPECT_TRUE((  //
+            fn::check_call<long&, std::string&, int&, double&>(CT_NON_CONST | CT_RVALUE)
+        ));
         rust::visit(std::move(cobj), x1, x2, x3, x4);
         EXPECT_TRUE((fn::check_call<long&, std::string&, int&, double&>(CT_CONST | CT_RVALUE)));
     }
@@ -88,13 +90,15 @@ TEST(VariantTestVisit, ForwardCallOperator) {
         using v = variant<int, long, double, int*, std::string>;
         v x1(3l), x2("hello"), x3(nullptr), x4(1.1);
         rust::visit(obj, x1, x2, x3, x4);
-        EXPECT_TRUE((fn::check_call<long&, std::string&, int*&, double&>(CT_NON_CONST | CT_LVALUE))
-        );
+        EXPECT_TRUE((  //
+            fn::check_call<long&, std::string&, int*&, double&>(CT_NON_CONST | CT_LVALUE)
+        ));
         rust::visit(cobj, x1, x2, x3, x4);
         EXPECT_TRUE((fn::check_call<long&, std::string&, int*&, double&>(CT_CONST | CT_LVALUE)));
         rust::visit(std::move(obj), x1, x2, x3, x4);
-        EXPECT_TRUE((fn::check_call<long&, std::string&, int*&, double&>(CT_NON_CONST | CT_RVALUE))
-        );
+        EXPECT_TRUE((  //
+            fn::check_call<long&, std::string&, int*&, double&>(CT_NON_CONST | CT_RVALUE)
+        ));
         rust::visit(std::move(cobj), x1, x2, x3, x4);
         EXPECT_TRUE((fn::check_call<long&, std::string&, int*&, double&>(CT_CONST | CT_RVALUE)));
     }
@@ -299,7 +303,8 @@ TEST(VariantTestVisit, ReturnType) {
         v x1(data1), x2(data2), x3(data3);
         static_assert(std::is_same<decltype(rust::visit(obj, x1, x2, x3)), fn&>::value);
         static_assert(std::is_same<decltype(rust::visit(cobj, x1, x2, x3)), const fn&>::value);
-        static_assert(std::is_same<decltype(rust::visit(std::move(obj), x1, x2, x3)), fn&&>::value
+        static_assert(  //
+            std::is_same<decltype(rust::visit(std::move(obj), x1, x2, x3)), fn&&>::value
         );
         static_assert(
             std::is_same<decltype(rust::visit(std::move(cobj), x1, x2, x3)), const fn&&>::value
@@ -472,12 +477,12 @@ struct any_visitor {
 template <
     class Ty,
     class = decltype(rust::visit(std::declval<any_visitor&>(), std::declval<Ty>()))>
-constexpr bool has_visit(int) {
+constexpr auto has_visit(int) -> bool {
     return true;
 }
 
 template <class Ty>
-constexpr bool has_visit(...) {
+constexpr auto has_visit(...) -> bool {
     return false;
 }
 
@@ -489,13 +494,10 @@ TEST(VariantTestVisit, Deleted) {
 
     static_assert(!has_visit<int>(0));
 #ifndef _MSC_VER
-    /*
-     * MSVC considers that bad_variant1 can be used for rust::visit because it can
-     * be legally used as the argument type of as_variant(). In fact, bad_variant1
-     * cannot be used to call as_variant() because the variant base class is
-     * ambiguous. In fact, both gcc and Clang give correct results. This seems
-     * another bug of MSVC.
-     */
+    // MSVC considers that bad_variant1 can be used for rust::visit because it can be legally used
+    // as the argument type of as_variant(). In fact, bad_variant1
+    // cannot be used to call as_variant() because the variant base class is ambiguous. In fact,
+    // both gcc and Clang give correct results. This seems another bug of MSVC.
     static_assert(!has_visit<bad_variant1>(0));
 #else
     bad_variant1 _unused [[maybe_unused]];
@@ -509,7 +511,7 @@ TEST(VariantTestVisit, Deleted) {
 template <class T>
 struct convert_to_visitor {
     template <class U, std::enable_if_t<std::is_convertible_v<U, T>, int> = 0>
-    constexpr T operator()(U&& u) const {
+    constexpr auto operator()(U&& u) const -> T {
         return std::forward<U>(u);
     }
 };
@@ -536,7 +538,7 @@ TEST(VariantTestVisit, ImmobileFunctionVisit) {
 TEST(VariantTestVisit, VisitPointerToMember) {
     struct base {
         int x;
-        int f() const {
+        auto f() const -> int {
             return x;
         }
     };
@@ -594,6 +596,5 @@ TEST(VariantTestVisit, VisitReference) {
         EXPECT_EQ(rust::visit([](auto& ref) -> void* { return &ref; }, x), &data);
     }
 }
-
 }  // namespace
 }  // namespace rust

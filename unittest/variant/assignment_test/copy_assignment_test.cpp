@@ -22,16 +22,16 @@ TEST(VariantTestCopyAssignment, Deleted) {
     struct copy_only {
         copy_only(const copy_only&) = default;
         copy_only(copy_only&&) = delete;
-        copy_only& operator=(const copy_only&) = default;
-        copy_only& operator=(copy_only&&) = delete;
+        auto operator=(const copy_only&) -> copy_only& = default;
+        auto operator=(copy_only&&) -> copy_only& = delete;
     };
     static_assert(std::is_copy_assignable<variant<int, copy_only>>::value);
 
     struct copy_construct_only {
         copy_construct_only(const copy_construct_only&) = default;
         copy_construct_only(copy_construct_only&&) = delete;
-        copy_construct_only& operator=(const copy_construct_only&) = delete;
-        copy_construct_only& operator=(copy_construct_only&&) = delete;
+        auto operator=(const copy_construct_only&) -> copy_construct_only& = delete;
+        auto operator=(copy_construct_only&&) -> copy_construct_only& = delete;
     };
     static_assert(!std::is_copy_assignable<variant<int, copy_construct_only>>::value);
     static_assert(std::is_copy_assignable<variant<int, copy_construct_only&>>::value);
@@ -39,8 +39,8 @@ TEST(VariantTestCopyAssignment, Deleted) {
     struct copy_assign_only {
         copy_assign_only(const copy_assign_only&) = delete;
         copy_assign_only(copy_assign_only&&) = delete;
-        copy_assign_only& operator=(const copy_assign_only&) = default;
-        copy_assign_only& operator=(copy_assign_only&&) = delete;
+        auto operator=(const copy_assign_only&) -> copy_assign_only& = default;
+        auto operator=(copy_assign_only&&) -> copy_assign_only& = delete;
     };
     static_assert(!std::is_copy_assignable<variant<int, copy_assign_only>>::value);
     static_assert(std::is_copy_assignable<variant<int, copy_assign_only&>>::value);
@@ -48,8 +48,8 @@ TEST(VariantTestCopyAssignment, Deleted) {
     struct non_copyable {
         non_copyable(const non_copyable&) = delete;
         non_copyable(non_copyable&&) = default;
-        non_copyable& operator=(const non_copyable&) = delete;
-        non_copyable& operator=(non_copyable&&) = default;
+        auto operator=(const non_copyable&) -> non_copyable& = delete;
+        auto operator=(non_copyable&&) -> non_copyable& = default;
     };
     static_assert(!std::is_copy_assignable<variant<int, non_copyable>>::value);
     static_assert(std::is_copy_assignable<variant<int, non_copyable&>>::value);
@@ -68,16 +68,17 @@ TEST(VariantTestCopyAssignment, Trivial) {
 
     struct trivially_copyable {
         trivially_copyable(const trivially_copyable&) = default;
-        trivially_copyable& operator=(const trivially_copyable&) = default;
+        auto operator=(const trivially_copyable&) -> trivially_copyable& = default;
     };
     static_assert(std::is_trivially_copy_assignable<variant<int, trivially_copyable>>::value);
 
     struct non_trivially_copy_constructible {
         non_trivially_copy_constructible(const non_trivially_copy_constructible&) { }
         non_trivially_copy_constructible(non_trivially_copy_constructible&&) = default;
-        non_trivially_copy_constructible& operator=(const non_trivially_copy_constructible&) =
-            default;
-        non_trivially_copy_constructible& operator=(non_trivially_copy_constructible&&) = default;
+        auto operator=(const non_trivially_copy_constructible&)
+            -> non_trivially_copy_constructible& = default;
+        auto operator=(non_trivially_copy_constructible&&)
+            -> non_trivially_copy_constructible& = default;
         ~non_trivially_copy_constructible() = default;
     };
     static_assert(
@@ -87,19 +88,21 @@ TEST(VariantTestCopyAssignment, Trivial) {
     static_assert(
         std::is_trivially_copy_assignable<variant<int, non_trivially_copy_constructible&>>::value
     );
-    static_assert(
-        !std::is_trivially_copy_assignable<
-            variant<int, non_trivially_copy_constructible, non_trivially_copy_constructible&>>::
-            value
+    static_assert(  //
+        !std::is_trivially_copy_assignable<variant<  //
+            int,
+            non_trivially_copy_constructible,
+            non_trivially_copy_constructible&>>::value
     );
 
     struct non_trivially_copy_assignable {
         non_trivially_copy_assignable(const non_trivially_copy_assignable&) = default;
         non_trivially_copy_assignable(non_trivially_copy_assignable&&) = default;
-        non_trivially_copy_assignable& operator=(const non_trivially_copy_assignable&) {
+        auto operator=(const non_trivially_copy_assignable&) -> non_trivially_copy_assignable& {
             return *this;
         }
-        non_trivially_copy_assignable& operator=(non_trivially_copy_assignable&&) = default;
+        auto operator=(non_trivially_copy_assignable&&)
+            -> non_trivially_copy_assignable& = default;
         ~non_trivially_copy_assignable() = default;
     };
     static_assert(
@@ -117,8 +120,8 @@ TEST(VariantTestCopyAssignment, Trivial) {
     struct non_trivially_destructible {
         non_trivially_destructible(const non_trivially_destructible&) = default;
         non_trivially_destructible(non_trivially_destructible&&) = default;
-        non_trivially_destructible& operator=(const non_trivially_destructible&) = default;
-        non_trivially_destructible& operator=(non_trivially_destructible&&) = default;
+        auto operator=(const non_trivially_destructible&) -> non_trivially_destructible& = default;
+        auto operator=(non_trivially_destructible&&) -> non_trivially_destructible& = default;
         ~non_trivially_destructible() { }
     };
     static_assert(
@@ -131,18 +134,24 @@ TEST(VariantTestCopyAssignment, Trivial) {
     static_assert(!std::is_trivially_copy_assignable<
                   variant<int, non_trivially_destructible, non_trivially_destructible&>>::value);
 
+    // clang-format off
     struct trivially_copy_assignable_non_trivially_moveable {
-        trivially_copy_assignable_non_trivially_moveable(const trivially_copy_assignable_non_trivially_moveable&) =
-            default;
-        trivially_copy_assignable_non_trivially_moveable(trivially_copy_assignable_non_trivially_moveable&&) {
-        }
-        trivially_copy_assignable_non_trivially_moveable&
-        operator=(const trivially_copy_assignable_non_trivially_moveable&) = default;
-        trivially_copy_assignable_non_trivially_moveable&
-        operator=(trivially_copy_assignable_non_trivially_moveable&&) {
+        trivially_copy_assignable_non_trivially_moveable(
+            const trivially_copy_assignable_non_trivially_moveable&
+        ) = default;
+        trivially_copy_assignable_non_trivially_moveable(
+            trivially_copy_assignable_non_trivially_moveable&&
+        ) { }
+        auto operator=(
+            const trivially_copy_assignable_non_trivially_moveable&
+        ) -> trivially_copy_assignable_non_trivially_moveable& = default;
+        auto operator=(
+            trivially_copy_assignable_non_trivially_moveable&&
+        ) -> trivially_copy_assignable_non_trivially_moveable& {
             return *this;
         }
     };
+    // clang-format on
     static_assert(std::is_trivially_copy_assignable<
                   variant<int, trivially_copy_assignable_non_trivially_moveable>>::value);
     static_assert(std::is_trivially_copy_assignable<
@@ -163,14 +172,15 @@ TEST(VariantTestCopyAssignment, Noexcept) {
     struct nothrow_copyable {
         nothrow_copyable(const nothrow_copyable&) noexcept = default;
         nothrow_copyable(nothrow_copyable&&) = default;
-        nothrow_copyable& operator=(const nothrow_copyable&) noexcept = default;
-        nothrow_copyable& operator=(nothrow_copyable&&) = default;
+        auto operator=(const nothrow_copyable&) noexcept -> nothrow_copyable& = default;
+        auto operator=(nothrow_copyable&&) -> nothrow_copyable& = default;
     };
     static_assert(std::is_nothrow_copy_assignable<variant<int, nothrow_copyable>>::value);
 
     struct throw_copy_constructible {
         throw_copy_constructible(const throw_copy_constructible&);
-        throw_copy_constructible& operator=(const throw_copy_constructible&) noexcept = default;
+        auto operator=(const throw_copy_constructible&) noexcept
+            -> throw_copy_constructible& = default;
     };
     static_assert(!std::is_nothrow_copy_assignable<variant<int, throw_copy_constructible>>::value);
     static_assert(std::is_nothrow_copy_assignable<variant<int, throw_copy_constructible&>>::value);
@@ -179,7 +189,7 @@ TEST(VariantTestCopyAssignment, Noexcept) {
 
     struct throw_copy_assignable {
         throw_copy_assignable(const throw_copy_assignable&) noexcept = default;
-        throw_copy_assignable& operator=(const throw_copy_assignable&);
+        auto operator=(const throw_copy_assignable&) -> throw_copy_assignable&;
     };
     static_assert(!std::is_nothrow_copy_assignable<variant<int, throw_copy_assignable>>::value);
     static_assert(std::is_nothrow_copy_assignable<variant<int, throw_copy_assignable&>>::value);
@@ -188,7 +198,7 @@ TEST(VariantTestCopyAssignment, Noexcept) {
 
     struct throw_copyable {
         throw_copyable(const throw_copyable&);
-        throw_copyable& operator=(const throw_copyable&);
+        auto operator=(const throw_copyable&) -> throw_copyable&;
     };
     static_assert(!std::is_nothrow_copy_assignable<variant<int, throw_copyable>>::value);
     static_assert(std::is_nothrow_copy_assignable<variant<int, throw_copyable&>>::value);
@@ -366,14 +376,15 @@ TEST(VariantTestCopyAssignment, BasicBehavior) {
             nothrow_copy_constructible(nothrow_copy_constructible&&) {
                 move_ctor = true;
             }
-            nothrow_copy_constructible& operator=(const nothrow_copy_constructible&) = default;
-            nothrow_copy_constructible& operator=(nothrow_copy_constructible&&) = default;
+            auto operator=(const nothrow_copy_constructible&)
+                -> nothrow_copy_constructible& = default;
+            auto operator=(nothrow_copy_constructible&&) -> nothrow_copy_constructible& = default;
         };
 
         struct throw_copy_constructible {
             throw_copy_constructible() = default;
             throw_copy_constructible(const throw_copy_constructible&) { }
-            throw_copy_constructible& operator=(const throw_copy_constructible&) = default;
+            auto operator=(const throw_copy_constructible&) -> throw_copy_constructible& = default;
         };
 
         using v = variant<throw_copy_constructible, nothrow_copy_constructible>;
@@ -406,8 +417,10 @@ TEST(VariantTestCopyAssignment, BasicBehavior) {
             may_throw_copy_constructible(may_throw_copy_constructible&&) noexcept {
                 move_ctor = true;
             }
-            may_throw_copy_constructible& operator=(const may_throw_copy_constructible&) = default;
-            may_throw_copy_constructible& operator=(may_throw_copy_constructible&&) = default;
+            auto operator=(const may_throw_copy_constructible&)
+                -> may_throw_copy_constructible& = default;
+            auto operator=(may_throw_copy_constructible&&)
+                -> may_throw_copy_constructible& = default;
         };
 
         using v = variant<int, may_throw_copy_constructible>;
@@ -439,8 +452,8 @@ TEST(VariantTestCopyAssignment, BasicBehavior) {
             throw_copy_constructible(throw_copy_constructible&&) noexcept {
                 move_ctor = true;
             }
-            throw_copy_constructible& operator=(const throw_copy_constructible&) = default;
-            throw_copy_constructible& operator=(throw_copy_constructible&&) = default;
+            auto operator=(const throw_copy_constructible&) -> throw_copy_constructible& = default;
+            auto operator=(throw_copy_constructible&&) -> throw_copy_constructible& = default;
         };
 
         using v = variant<int, throw_copy_constructible>;
@@ -521,12 +534,12 @@ TEST(VariantTestCopyAssignment, BasicBehavior) {
 }
 
 template <class V1, class V2, class Ty>
-constexpr bool constexpr_copy_assign_impl(
+constexpr auto constexpr_copy_assign_impl(
     V1&& lhs,
     V2&& rhs,
     std::size_t expected_index,
     Ty expected_value
-) {
+) -> bool {
     V2 const _rhs(std::forward<V2>(rhs));
     lhs = _rhs;
     return lhs.index() == expected_index && get<Ty>(lhs) == expected_value;

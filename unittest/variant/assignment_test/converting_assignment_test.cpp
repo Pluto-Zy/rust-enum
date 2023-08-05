@@ -114,7 +114,7 @@ TEST(VariantTestConvertingAssignment, Noexcept) {
     {
         struct nothrow {
             nothrow(int) noexcept { }
-            nothrow& operator=(int) noexcept {
+            auto operator=(int) noexcept -> nothrow& {
                 return *this;
             }
         };
@@ -123,7 +123,7 @@ TEST(VariantTestConvertingAssignment, Noexcept) {
     {
         struct throws_constructor {
             throws_constructor(int) noexcept(false) { }
-            throws_constructor& operator=(int) noexcept {
+            auto operator=(int) noexcept -> throws_constructor& {
                 return *this;
             }
         };
@@ -132,7 +132,7 @@ TEST(VariantTestConvertingAssignment, Noexcept) {
     {
         struct throws_assignment {
             throws_assignment(int) noexcept { }
-            throws_assignment& operator=(int) noexcept(false) {
+            auto operator=(int) noexcept(false) -> throws_assignment& {
                 return *this;
             }
         };
@@ -140,7 +140,7 @@ TEST(VariantTestConvertingAssignment, Noexcept) {
     }
     {
         struct throws_copy {
-            throws_copy& operator=(const throws_copy&) noexcept(false) {
+            auto operator=(const throws_copy&) noexcept(false) -> throws_copy& {
                 return *this;
             }
         };
@@ -218,11 +218,11 @@ TEST(VariantTestConvertingAssignment, BasicBehavior) {
             throw_assignable(int val) : value(val) { }
             throw_assignable(const throw_assignable&) = default;
             throw_assignable(throw_assignable&&) = default;
-            throw_assignable& operator=(int) {
+            auto operator=(int) -> throw_assignable& {
                 throw 1;
             }
-            throw_assignable& operator=(const throw_assignable&) = default;
-            throw_assignable& operator=(throw_assignable&&) = default;
+            auto operator=(const throw_assignable&) -> throw_assignable& = default;
+            auto operator=(throw_assignable&&) -> throw_assignable& = default;
         };
 
         using v = variant<throw_assignable>;
@@ -242,12 +242,12 @@ TEST(VariantTestConvertingAssignment, BasicBehavior) {
             }
             nothrow_assignable(const nothrow_assignable&) = default;
             nothrow_assignable(nothrow_assignable&&) = default;
-            nothrow_assignable& operator=(int val) noexcept {
+            auto operator=(int val) noexcept -> nothrow_assignable& {
                 value = val;
                 return *this;
             }
-            nothrow_assignable& operator=(const nothrow_assignable&) = default;
-            nothrow_assignable& operator=(nothrow_assignable&&) = default;
+            auto operator=(const nothrow_assignable&) -> nothrow_assignable& = default;
+            auto operator=(nothrow_assignable&&) -> nothrow_assignable& = default;
         };
 
         using v = variant<nothrow_assignable>;
@@ -264,11 +264,11 @@ TEST(VariantTestConvertingAssignment, BasicBehavior) {
             nothrow_constructible(int val) noexcept : value(val) { }
             nothrow_constructible(const nothrow_constructible&) = default;
             nothrow_constructible(nothrow_constructible&&) { }
-            nothrow_constructible& operator=(int) {
+            auto operator=(int) -> nothrow_constructible& {
                 throw 1;
             }
-            nothrow_constructible& operator=(const nothrow_constructible&) = default;
-            nothrow_constructible& operator=(nothrow_constructible&&) = default;
+            auto operator=(const nothrow_constructible&) -> nothrow_constructible& = default;
+            auto operator=(nothrow_constructible&&) -> nothrow_constructible& = default;
         };
 
         using v = variant<std::string, nothrow_constructible>;
@@ -290,13 +290,13 @@ TEST(VariantTestConvertingAssignment, BasicBehavior) {
             throw_constructible_noexcept_move(throw_constructible_noexcept_move&&) noexcept {
                 move_ctor = true;
             }
-            throw_constructible_noexcept_move& operator=(int) {
+            auto operator=(int) -> throw_constructible_noexcept_move& {
                 return *this;
             }
-            throw_constructible_noexcept_move&
-            operator=(const throw_constructible_noexcept_move&) = default;
-            throw_constructible_noexcept_move& operator=(throw_constructible_noexcept_move&&) =
-                default;
+            auto operator=(const throw_constructible_noexcept_move&)
+                -> throw_constructible_noexcept_move& = default;
+            auto operator=(throw_constructible_noexcept_move&&)
+                -> throw_constructible_noexcept_move& = default;
         };
 
         using v = variant<std::string, throw_constructible_noexcept_move>;
@@ -320,9 +320,10 @@ TEST(VariantTestConvertingAssignment, BasicBehavior) {
             throw_constructible_throw_move(throw_constructible_throw_move&&) {
                 move_ctor = true;
             }
-            throw_constructible_throw_move& operator=(const throw_constructible_throw_move&) =
-                default;
-            throw_constructible_throw_move& operator=(throw_constructible_throw_move&&) = default;
+            auto operator=(const throw_constructible_throw_move&)
+                -> throw_constructible_throw_move& = default;
+            auto operator=(throw_constructible_throw_move&&)
+                -> throw_constructible_throw_move& = default;
         };
 
         using v = variant<std::string, throw_constructible_throw_move>;

@@ -18,8 +18,8 @@ struct throw_empty {
     throw_empty() = default;
     throw_empty(const throw_empty&) = default;
     throw_empty(throw_empty&&) { }
-    throw_empty& operator=(const throw_empty&) = default;
-    throw_empty& operator=(throw_empty&&) = default;
+    auto operator=(const throw_empty&) -> throw_empty& = default;
+    auto operator=(throw_empty&&) -> throw_empty& = default;
 };
 
 struct not_empty {

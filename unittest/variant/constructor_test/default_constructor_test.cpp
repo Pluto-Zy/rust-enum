@@ -19,7 +19,8 @@ TEST(VariantTestDefaultConstructor, Deleted) {
             non_default_constructible(int);
         };
         static_assert(!std::is_default_constructible<variant<non_default_constructible>>::value);
-        static_assert(std::is_default_constructible<variant<int, non_default_constructible>>::value
+        static_assert(  //
+            std::is_default_constructible<variant<int, non_default_constructible>>::value
         );
         static_assert(
             !std::is_default_constructible<variant<non_default_constructible, int>>::value

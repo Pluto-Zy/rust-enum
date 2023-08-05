@@ -20,7 +20,8 @@ TEST(VariantTestDestructor, Trivial) {
         };
 
         static_assert(!std::is_trivially_destructible<variant<trivially_destructible>>::value);
-        static_assert(!std::is_trivially_destructible<variant<int, trivially_destructible>>::value
+        static_assert(  //
+            !std::is_trivially_destructible<variant<int, trivially_destructible>>::value
         );
         static_assert(
             !std::is_trivially_destructible<variant<int, int, trivially_destructible>>::value

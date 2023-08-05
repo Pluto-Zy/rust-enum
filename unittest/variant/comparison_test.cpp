@@ -16,45 +16,45 @@ struct compares_to_my_bool {
     int value = 0;
 };
 
-constexpr my_bool operator==(
+constexpr auto operator==(  //
     const compares_to_my_bool& lhs,
     const compares_to_my_bool& rhs
-) noexcept {
+) noexcept -> my_bool {
     return my_bool(lhs.value == rhs.value);
 }
 
-constexpr my_bool operator!=(
+constexpr auto operator!=(  //
     const compares_to_my_bool& lhs,
     const compares_to_my_bool& rhs
-) noexcept {
+) noexcept -> my_bool {
     return my_bool(lhs.value != rhs.value);
 }
 
-constexpr my_bool operator<(
+constexpr auto operator<(  //
     const compares_to_my_bool& lhs,
     const compares_to_my_bool& rhs
-) noexcept {
+) noexcept -> my_bool {
     return my_bool(lhs.value < rhs.value);
 }
 
-constexpr my_bool operator<=(
+constexpr auto operator<=(  //
     const compares_to_my_bool& lhs,
     const compares_to_my_bool& rhs
-) noexcept {
+) noexcept -> my_bool {
     return my_bool(lhs.value <= rhs.value);
 }
 
-constexpr my_bool operator>(
+constexpr auto operator>(  //
     const compares_to_my_bool& lhs,
     const compares_to_my_bool& rhs
-) noexcept {
+) noexcept -> my_bool {
     return my_bool(lhs.value > rhs.value);
 }
 
-constexpr my_bool operator>=(
+constexpr auto operator>=(  //
     const compares_to_my_bool& lhs,
     const compares_to_my_bool& rhs
-) noexcept {
+) noexcept -> my_bool {
     return my_bool(lhs.value >= rhs.value);
 }
 
@@ -167,7 +167,7 @@ TEST(VariantTestComparison, Equality) {
 }
 
 template <class V>
-constexpr bool test_less(const V& l, const V& r, bool expect_less, bool expect_greater) {
+constexpr auto test_less(const V& l, const V& r, bool expect_less, bool expect_greater) -> bool {
     static_assert(std::is_same<decltype(l < r), bool>::value);
     static_assert(std::is_same<decltype(l <= r), bool>::value);
     static_assert(std::is_same<decltype(l > r), bool>::value);

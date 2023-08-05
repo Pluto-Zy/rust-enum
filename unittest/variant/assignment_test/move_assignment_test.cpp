@@ -22,8 +22,8 @@ TEST(VariantTestMoveAssignment, Deleted) {
     struct move_only {
         move_only(const move_only&) = delete;
         move_only(move_only&&) = default;
-        move_only& operator=(const move_only&) = delete;
-        move_only& operator=(move_only&&) = default;
+        auto operator=(const move_only&) -> move_only& = delete;
+        auto operator=(move_only&&) -> move_only& = default;
     };
     static_assert(!std::is_copy_assignable<variant<int, move_only>>::value);
     static_assert(std::is_move_assignable<variant<int, move_only>>::value);
@@ -31,8 +31,8 @@ TEST(VariantTestMoveAssignment, Deleted) {
     struct move_construct_only {
         move_construct_only(const move_construct_only&) = delete;
         move_construct_only(move_construct_only&&) = default;
-        move_construct_only& operator=(const move_construct_only&) = delete;
-        move_construct_only& operator=(move_construct_only&&) = delete;
+        auto operator=(const move_construct_only&) -> move_construct_only& = delete;
+        auto operator=(move_construct_only&&) -> move_construct_only& = delete;
     };
     static_assert(!std::is_copy_assignable<variant<int, move_construct_only>>::value);
     static_assert(!std::is_move_assignable<variant<int, move_construct_only>>::value);
@@ -41,8 +41,8 @@ TEST(VariantTestMoveAssignment, Deleted) {
     struct move_assign_only {
         move_assign_only(const move_assign_only&) = delete;
         move_assign_only(move_assign_only&&) = delete;
-        move_assign_only& operator=(const move_assign_only&) = delete;
-        move_assign_only& operator=(move_assign_only&&) = default;
+        auto operator=(const move_assign_only&) -> move_assign_only& = delete;
+        auto operator=(move_assign_only&&) -> move_assign_only& = default;
     };
     static_assert(!std::is_copy_assignable<variant<int, move_assign_only>>::value);
     static_assert(!std::is_move_assignable<variant<int, move_assign_only>>::value);
@@ -52,8 +52,8 @@ TEST(VariantTestMoveAssignment, Deleted) {
         non_moveable() = default;
         non_moveable(const non_moveable&) = default;
         non_moveable(non_moveable&&) = delete;
-        non_moveable& operator=(const non_moveable&) = default;
-        non_moveable& operator=(non_moveable&&) = delete;
+        auto operator=(const non_moveable&) -> non_moveable& = default;
+        auto operator=(non_moveable&&) -> non_moveable& = delete;
     };
     static_assert(std::is_copy_assignable<variant<int, non_moveable>>::value);
     // use copy assignment
@@ -96,17 +96,18 @@ TEST(VariantTestMoveAssignment, Trivial) {
     struct trivially_moveable {
         trivially_moveable(const trivially_moveable&) = default;
         trivially_moveable(trivially_moveable&&) = default;
-        trivially_moveable& operator=(const trivially_moveable&) = default;
-        trivially_moveable& operator=(trivially_moveable&&) = default;
+        auto operator=(const trivially_moveable&) -> trivially_moveable& = default;
+        auto operator=(trivially_moveable&&) -> trivially_moveable& = default;
     };
     static_assert(std::is_trivially_move_assignable<variant<int, trivially_moveable>>::value);
 
     struct non_trivially_move_constructible {
         non_trivially_move_constructible(const non_trivially_move_constructible&) = default;
         non_trivially_move_constructible(non_trivially_move_constructible&&) { }
-        non_trivially_move_constructible& operator=(const non_trivially_move_constructible&) =
-            default;
-        non_trivially_move_constructible& operator=(non_trivially_move_constructible&&) = default;
+        auto operator=(const non_trivially_move_constructible&)
+            -> non_trivially_move_constructible& = default;
+        auto operator=(non_trivially_move_constructible&&)
+            -> non_trivially_move_constructible& = default;
         ~non_trivially_move_constructible() = default;
     };
     static_assert(
@@ -116,17 +117,19 @@ TEST(VariantTestMoveAssignment, Trivial) {
     static_assert(
         std::is_trivially_move_assignable<variant<int, non_trivially_move_constructible&>>::value
     );
-    static_assert(
-        !std::is_trivially_move_assignable<
-            variant<int, non_trivially_move_constructible, non_trivially_move_constructible&>>::
-            value
+    static_assert(  //
+        !std::is_trivially_move_assignable<variant<  //
+            int,
+            non_trivially_move_constructible,
+            non_trivially_move_constructible&>>::value
     );
 
     struct non_trivially_move_assignable {
         non_trivially_move_assignable(const non_trivially_move_assignable&) = default;
         non_trivially_move_assignable(non_trivially_move_assignable&&) = default;
-        non_trivially_move_assignable& operator=(const non_trivially_move_assignable&) = default;
-        non_trivially_move_assignable& operator=(non_trivially_move_assignable&&) {
+        auto operator=(const non_trivially_move_assignable&)
+            -> non_trivially_move_assignable& = default;
+        auto operator=(non_trivially_move_assignable&&) -> non_trivially_move_assignable& {
             return *this;
         }
         ~non_trivially_move_assignable() = default;
@@ -146,8 +149,8 @@ TEST(VariantTestMoveAssignment, Trivial) {
     struct non_trivially_destructible {
         non_trivially_destructible(const non_trivially_destructible&) = default;
         non_trivially_destructible(non_trivially_destructible&&) = default;
-        non_trivially_destructible& operator=(const non_trivially_destructible&) = default;
-        non_trivially_destructible& operator=(non_trivially_destructible&&) = default;
+        auto operator=(const non_trivially_destructible&) -> non_trivially_destructible& = default;
+        auto operator=(non_trivially_destructible&&) -> non_trivially_destructible& = default;
         ~non_trivially_destructible() { }
     };
     static_assert(
@@ -160,18 +163,24 @@ TEST(VariantTestMoveAssignment, Trivial) {
     static_assert(!std::is_trivially_move_assignable<
                   variant<int, non_trivially_destructible, non_trivially_destructible&>>::value);
 
+    // clang-format off
     struct trivially_move_assignable_non_trivially_copyable {
-        trivially_move_assignable_non_trivially_copyable(const trivially_move_assignable_non_trivially_copyable&) {
-        }
-        trivially_move_assignable_non_trivially_copyable(trivially_move_assignable_non_trivially_copyable&&) =
-            default;
-        trivially_move_assignable_non_trivially_copyable&
-        operator=(const trivially_move_assignable_non_trivially_copyable&) {
+        trivially_move_assignable_non_trivially_copyable(
+            const trivially_move_assignable_non_trivially_copyable&
+        ) { }
+        trivially_move_assignable_non_trivially_copyable(
+            trivially_move_assignable_non_trivially_copyable&&
+        ) = default;
+        auto operator=(
+            const trivially_move_assignable_non_trivially_copyable&
+        ) -> trivially_move_assignable_non_trivially_copyable& {
             return *this;
         }
-        trivially_move_assignable_non_trivially_copyable&
-        operator=(trivially_move_assignable_non_trivially_copyable&&) = default;
+        auto operator=(
+            trivially_move_assignable_non_trivially_copyable&&
+        ) -> trivially_move_assignable_non_trivially_copyable& = default;
     };
+    // clang-format on
     static_assert(std::is_trivially_move_assignable<
                   variant<int, trivially_move_assignable_non_trivially_copyable>>::value);
     static_assert(std::is_trivially_move_assignable<
@@ -192,16 +201,16 @@ TEST(VariantTestMoveAssignment, Noexcept) {
     struct nothrow_moveable {
         nothrow_moveable(const nothrow_moveable&) = default;
         nothrow_moveable(nothrow_moveable&&) noexcept = default;
-        nothrow_moveable& operator=(const nothrow_moveable&) = default;
-        nothrow_moveable& operator=(nothrow_moveable&&) noexcept = default;
+        auto operator=(const nothrow_moveable&) -> nothrow_moveable& = default;
+        auto operator=(nothrow_moveable&&) noexcept -> nothrow_moveable& = default;
     };
     static_assert(std::is_nothrow_move_assignable<variant<int, nothrow_moveable>>::value);
 
     struct throw_move_constructible {
         throw_move_constructible(const throw_move_constructible&) = default;
         throw_move_constructible(throw_move_constructible&&);
-        throw_move_constructible& operator=(const throw_move_constructible&) = default;
-        throw_move_constructible& operator=(throw_move_constructible&&) noexcept = default;
+        auto operator=(const throw_move_constructible&) -> throw_move_constructible& = default;
+        auto operator=(throw_move_constructible&&) noexcept -> throw_move_constructible& = default;
     };
     static_assert(!std::is_nothrow_move_assignable<variant<int, throw_move_constructible>>::value);
     static_assert(std::is_nothrow_move_assignable<variant<int, throw_move_constructible&>>::value);
@@ -211,8 +220,8 @@ TEST(VariantTestMoveAssignment, Noexcept) {
     struct throw_move_assignable {
         throw_move_assignable(const throw_move_assignable&) = default;
         throw_move_assignable(throw_move_assignable&&) noexcept = default;
-        throw_move_assignable& operator=(const throw_move_assignable&) = default;
-        throw_move_assignable& operator=(throw_move_assignable&&);
+        auto operator=(const throw_move_assignable&) -> throw_move_assignable& = default;
+        auto operator=(throw_move_assignable&&) -> throw_move_assignable&;
     };
     static_assert(!std::is_nothrow_move_assignable<variant<int, throw_move_assignable>>::value);
     static_assert(std::is_nothrow_move_assignable<variant<int, throw_move_assignable&>>::value);
@@ -222,8 +231,8 @@ TEST(VariantTestMoveAssignment, Noexcept) {
     struct throw_moveable {
         throw_moveable(const throw_moveable&) = default;
         throw_moveable(throw_moveable&&);
-        throw_moveable& operator=(const throw_moveable&) = default;
-        throw_moveable& operator=(throw_moveable&&);
+        auto operator=(const throw_moveable&) -> throw_moveable& = default;
+        auto operator=(throw_moveable&&) -> throw_moveable&;
     };
     static_assert(!std::is_nothrow_move_assignable<variant<int, throw_moveable>>::value);
     static_assert(std::is_nothrow_move_assignable<variant<int, throw_moveable&>>::value);
@@ -400,8 +409,9 @@ TEST(VariantTestMoveAssignment, BasicBehavior) {
             nothrow_move_constructible(nothrow_move_constructible&&) noexcept {
                 move_ctor = true;
             }
-            nothrow_move_constructible& operator=(const nothrow_move_constructible&) = default;
-            nothrow_move_constructible& operator=(nothrow_move_constructible&&) = default;
+            auto operator=(const nothrow_move_constructible&)
+                -> nothrow_move_constructible& = default;
+            auto operator=(nothrow_move_constructible&&) -> nothrow_move_constructible& = default;
         };
 
         using v = variant<int, nothrow_move_constructible>;
@@ -484,12 +494,12 @@ TEST(VariantTestMoveAssignment, BasicBehavior) {
 }
 
 template <class V1, class V2, class Ty>
-constexpr bool constexpr_move_assign_impl(
+constexpr auto constexpr_move_assign_impl(
     V1&& lhs,
     V2&& rhs,
     std::size_t expected_index,
     Ty expected_value
-) {
+) -> bool {
     lhs = std::move(rhs);
     return lhs.index() == expected_index && get<Ty>(lhs) == expected_value;
 }

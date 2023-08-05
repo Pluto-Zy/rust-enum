@@ -43,7 +43,8 @@ TEST(VariantTestTypeEmplace, Deleted) {
     static_assert(has_type_emplace<variant<int, int&>, int&, int&>::value);
     static_assert(has_type_emplace<variant<long&, int>, long&, long&>::value);
     static_assert(has_type_emplace<variant<long&, int>, int, long&>::value);
-    static_assert(!has_type_emplace<variant<int&, std::string&>, std::string&, const char*>::value
+    static_assert(  //
+        !has_type_emplace<variant<int&, std::string&>, std::string&, const char*>::value
     );
     static_assert(
         !has_type_emplace<variant<int&, std::string&>, std::string&, const char(&)[3]>::value
@@ -67,24 +68,39 @@ TEST(VariantTestTypeEmplace, Deleted) {
         static_assert(
             !has_type_emplace<variant<more_arguments>, more_arguments, int, double>::value
         );
-        static_assert(
-            !has_type_emplace<variant<more_arguments>, more_arguments, int, double, float, int>::
-                value
+        static_assert(  //
+            !has_type_emplace<  //
+                variant<more_arguments>,
+                more_arguments,
+                int,
+                double,
+                float,
+                int>::value
         );
-        static_assert(
-            has_type_emplace<variant<int, more_arguments>, more_arguments, int, double, float>::
-                value
+        static_assert(  //
+            has_type_emplace<  //
+                variant<int, more_arguments>,
+                more_arguments,
+                int,
+                double,
+                float>::value
         );
-        static_assert(!has_type_emplace<
-                      variant<int, more_arguments>,
-                      more_arguments,
-                      int,
-                      int,
-                      double,
-                      float>::value);
-        static_assert(
-            !has_type_emplace<variant<more_arguments&>, more_arguments&, int, double, double>::
-                value
+        static_assert(  //
+            !has_type_emplace<
+                variant<int, more_arguments>,
+                more_arguments,
+                int,
+                int,
+                double,
+                float>::value
+        );
+        static_assert(  //
+            !has_type_emplace<  //
+                variant<more_arguments&>,
+                more_arguments&,
+                int,
+                double,
+                double>::value
         );
     }
 }
@@ -330,12 +346,12 @@ TEST(VariantTestTypeEmplace, BasicBehavior) {
 
 #ifdef USE_CXX20
 template <class V, class Ty, class... Args>
-constexpr bool constexpr_emplace_impl(
+constexpr auto constexpr_emplace_impl(
     V&& v,
     std::size_t expected_index,
     Ty expected_value,
     Args&&... args
-) {
+) -> bool {
     v.template emplace<Ty>(std::forward<Args>(args)...);
     return v.index() == expected_index && get<Ty>(v) == expected_value;
 }
@@ -345,11 +361,11 @@ struct multiple_args {
     constexpr multiple_args(int x, int y, int z) noexcept : x(x), y(y), z(z) { }
 };
 
-constexpr bool operator==(const multiple_args& lhs, const multiple_args& rhs) {
+constexpr auto operator==(const multiple_args& lhs, const multiple_args& rhs) -> bool {
     return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
 }
 
-constexpr bool operator!=(const multiple_args& lhs, const multiple_args& rhs) {
+constexpr auto operator!=(const multiple_args& lhs, const multiple_args& rhs) -> bool {
     return !(lhs == rhs);
 }
 
@@ -417,9 +433,11 @@ TEST(VariantTestTypeEmplace, Noexcept) {
                       variant<may_throw_constructible, int>,
                       may_throw_constructible,
                       int>);
-        static_assert(
-            has_type_emplace<variant<may_throw_constructible, int>, may_throw_constructible, int>::
-                value
+        static_assert(  //
+            has_type_emplace<  //
+                variant<may_throw_constructible, int>,
+                may_throw_constructible,
+                int>::value
         );
         static_assert(has_noexcept_emplace_v<
                       variant<may_throw_constructible, int>,
@@ -429,9 +447,11 @@ TEST(VariantTestTypeEmplace, Noexcept) {
                       variant<int, may_throw_constructible>,
                       may_throw_constructible,
                       int>);
-        static_assert(
-            has_type_emplace<variant<int, may_throw_constructible>, may_throw_constructible, int>::
-                value
+        static_assert(  //
+            has_type_emplace<  //
+                variant<int, may_throw_constructible>,
+                may_throw_constructible,
+                int>::value
         );
         static_assert(has_noexcept_emplace_v<
                       variant<int, may_throw_constructible>,
@@ -443,32 +463,37 @@ TEST(VariantTestTypeEmplace, Noexcept) {
             more_arguments(int, double, float) noexcept;
             more_arguments(float, double, int);
         };
-        static_assert(has_noexcept_emplace_v<
+        static_assert(//
+            has_noexcept_emplace_v<
                       variant<more_arguments>,
                       more_arguments,
                       int,
                       double,
                       float>);
-        static_assert(has_noexcept_emplace_v<
+        static_assert(//
+            has_noexcept_emplace_v<
                       variant<more_arguments>,
                       more_arguments,
                       int,
                       double,
                       double>);
-        static_assert(!has_noexcept_emplace_v<
+        static_assert(//
+            !has_noexcept_emplace_v<
                       variant<more_arguments>,
                       more_arguments,
                       float,
                       double,
                       int>);
-        static_assert(has_noexcept_emplace_v<
+        static_assert(//
+            has_noexcept_emplace_v<
                       variant<int, more_arguments>,
                       more_arguments,
                       int,
                       double,
                       float>);
-        static_assert(!has_noexcept_emplace_v<
-                      variant<int, more_arguments>,
+        static_assert(//
+            !has_noexcept_emplace_v<
+                variant<int, more_arguments>,
                       more_arguments,
                       float,
                       double,

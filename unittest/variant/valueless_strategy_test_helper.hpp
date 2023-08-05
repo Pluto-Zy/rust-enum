@@ -16,8 +16,8 @@ struct may_throw_copy_constructible {
     may_throw_copy_constructible(may_throw_copy_constructible&&) {
         move_ctor = true;
     }
-    may_throw_copy_constructible& operator=(const may_throw_copy_constructible&) = default;
-    may_throw_copy_constructible& operator=(may_throw_copy_constructible&&) = default;
+    auto operator=(const may_throw_copy_constructible&) -> may_throw_copy_constructible& = default;
+    auto operator=(may_throw_copy_constructible&&) -> may_throw_copy_constructible& = default;
 };
 
 struct throw_copy_constructible {
@@ -30,8 +30,8 @@ struct throw_copy_constructible {
     throw_copy_constructible(throw_copy_constructible&&) {
         move_ctor = true;
     }
-    throw_copy_constructible& operator=(const throw_copy_constructible&) = default;
-    throw_copy_constructible& operator=(throw_copy_constructible&&) = default;
+    auto operator=(const throw_copy_constructible&) -> throw_copy_constructible& = default;
+    auto operator=(throw_copy_constructible&&) -> throw_copy_constructible& = default;
 };
 
 struct may_throw_copy_constructible_strategy_default : may_throw_copy_constructible { };
@@ -78,8 +78,8 @@ struct throw_move_constructible {
     throw_move_constructible(throw_move_constructible&&) {
         throw 2;
     }
-    throw_move_constructible& operator=(const throw_move_constructible&) = default;
-    throw_move_constructible& operator=(throw_move_constructible&&) = default;
+    auto operator=(const throw_move_constructible&) -> throw_move_constructible& = default;
+    auto operator=(throw_move_constructible&&) -> throw_move_constructible& = default;
 };
 
 struct may_throw_move_constructible_strategy_default : may_throw_move_constructible { };
@@ -130,8 +130,8 @@ struct may_throw_constructible {
     may_throw_constructible(may_throw_constructible&&) {
         move_ctor = true;
     }
-    may_throw_constructible& operator=(const may_throw_constructible&) = default;
-    may_throw_constructible& operator=(may_throw_constructible&&) = default;
+    auto operator=(const may_throw_constructible&) -> may_throw_constructible& = default;
+    auto operator=(may_throw_constructible&&) -> may_throw_constructible& = default;
 };
 
 struct throw_constructible {
@@ -152,8 +152,8 @@ struct throw_constructible {
     throw_constructible(throw_constructible&&) {
         move_ctor = true;
     }
-    throw_constructible& operator=(const throw_constructible&) = default;
-    throw_constructible& operator=(throw_constructible&&) = default;
+    auto operator=(const throw_constructible&) -> throw_constructible& = default;
+    auto operator=(throw_constructible&&) -> throw_constructible& = default;
 };
 
 struct may_throw_constructible_strategy_default : may_throw_constructible {

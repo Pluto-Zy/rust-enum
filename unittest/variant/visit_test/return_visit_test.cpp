@@ -62,13 +62,15 @@ void ret_visit_forward_call_operator_test_impl() {
         using v = variant<int, long, double, std::string>;
         v x1(3l), x2("hello"), x3(4), x4(1.1);
         rust::visit<Ret>(obj, x1, x2, x3, x4);
-        EXPECT_TRUE((fn::check_call<long&, std::string&, int&, double&>(CT_NON_CONST | CT_LVALUE))
-        );
+        EXPECT_TRUE((  //
+            fn::check_call<long&, std::string&, int&, double&>(CT_NON_CONST | CT_LVALUE)
+        ));
         rust::visit<Ret>(cobj, x1, x2, x3, x4);
         EXPECT_TRUE((fn::check_call<long&, std::string&, int&, double&>(CT_CONST | CT_LVALUE)));
         rust::visit<Ret>(std::move(obj), x1, x2, x3, x4);
-        EXPECT_TRUE((fn::check_call<long&, std::string&, int&, double&>(CT_NON_CONST | CT_RVALUE))
-        );
+        EXPECT_TRUE((  //
+            fn::check_call<long&, std::string&, int&, double&>(CT_NON_CONST | CT_RVALUE)
+        ));
         rust::visit<Ret>(std::move(cobj), x1, x2, x3, x4);
         EXPECT_TRUE((fn::check_call<long&, std::string&, int&, double&>(CT_CONST | CT_RVALUE)));
     }
@@ -76,13 +78,15 @@ void ret_visit_forward_call_operator_test_impl() {
         using v = variant<int, long, double, int*, std::string>;
         v x1(3l), x2("hello"), x3(nullptr), x4(1.1);
         rust::visit<Ret>(obj, x1, x2, x3, x4);
-        EXPECT_TRUE((fn::check_call<long&, std::string&, int*&, double&>(CT_NON_CONST | CT_LVALUE))
-        );
+        EXPECT_TRUE((  //
+            fn::check_call<long&, std::string&, int*&, double&>(CT_NON_CONST | CT_LVALUE)
+        ));
         rust::visit<Ret>(cobj, x1, x2, x3, x4);
         EXPECT_TRUE((fn::check_call<long&, std::string&, int*&, double&>(CT_CONST | CT_LVALUE)));
         rust::visit<Ret>(std::move(obj), x1, x2, x3, x4);
-        EXPECT_TRUE((fn::check_call<long&, std::string&, int*&, double&>(CT_NON_CONST | CT_RVALUE))
-        );
+        EXPECT_TRUE((  //
+            fn::check_call<long&, std::string&, int*&, double&>(CT_NON_CONST | CT_RVALUE)
+        ));
         rust::visit<Ret>(std::move(cobj), x1, x2, x3, x4);
         EXPECT_TRUE((fn::check_call<long&, std::string&, int*&, double&>(CT_CONST | CT_RVALUE)));
     }
@@ -257,9 +261,11 @@ void ret_visit_return_type_test_impl() {
         v2 x2("hello");
         static_assert(std::is_same<decltype(rust::visit<Ret>(obj, x1, x2)), Ret>::value);
         static_assert(std::is_same<decltype(rust::visit<Ret>(cobj, x1, x2)), Ret>::value);
-        static_assert(std::is_same<decltype(rust::visit<Ret>(std::move(obj), x1, x2)), Ret>::value
+        static_assert(  //
+            std::is_same<decltype(rust::visit<Ret>(std::move(obj), x1, x2)), Ret>::value
         );
-        static_assert(std::is_same<decltype(rust::visit<Ret>(std::move(cobj), x1, x2)), Ret>::value
+        static_assert(  //
+            std::is_same<decltype(rust::visit<Ret>(std::move(cobj), x1, x2)), Ret>::value
         );
     }
     {
@@ -327,7 +333,7 @@ using std::identity;
 #else
 struct identity {
     template <class Ty>
-    constexpr Ty&& operator()(Ty&& t) const noexcept {
+    constexpr auto operator()(Ty&& t) const noexcept -> Ty&& {
         return std::forward<Ty>(t);
     }
 };
@@ -629,7 +635,7 @@ TEST(VariantTestReturnVisit, DerivedFromVariant) {
 
 struct any_visitor_for_ret_visit {
     template <class Ty>
-    bool operator()(const Ty&) {
+    auto operator()(const Ty&) -> bool {
         return true;
     }
 };
@@ -638,12 +644,12 @@ template <
     class Ty,
     class = decltype(rust::visit<
                      bool>(std::declval<any_visitor_for_ret_visit&>(), std::declval<Ty>()))>
-constexpr bool has_ret_visit(int) {
+constexpr auto has_ret_visit(int) -> bool {
     return true;
 }
 
 template <class Ty>
-constexpr bool has_ret_visit(...) {
+constexpr auto has_ret_visit(...) -> bool {
     return false;
 }
 
@@ -655,13 +661,10 @@ TEST(VariantTestReturnVisit, Deleted) {
 
     static_assert(!has_ret_visit<int>(0));
 #ifndef _MSC_VER
-    /*
-     * MSVC considers that bad_variant1 can be used for rust::visit because it can
-     * be legally used as the argument type of as_variant(). In fact, bad_variant1
-     * cannot be used to call as_variant() because the variant base class is
-     * ambiguous. In fact, both gcc and Clang give correct results. This seems
-     * another bug of MSVC.
-     */
+    // MSVC considers that bad_variant1 can be used for rust::visit because it can be legally used
+    // as the argument type of as_variant(). In fact, bad_variant1 cannot be used to call
+    // as_variant() because the variant base class is ambiguous. In fact, both gcc and Clang give
+    // correct results. This seems another bug of MSVC.
     static_assert(!has_ret_visit<bad_variant1>(0));
 #else
     bad_variant1 _unused [[maybe_unused]];
@@ -682,11 +685,11 @@ struct mobile_data {
     mobile_data(mobile_data&&) {
         ADD_FAILURE();
     }
-    mobile_data& operator=(const mobile_data&) {
+    auto operator=(const mobile_data&) -> mobile_data& {
         ADD_FAILURE();
         return *this;
     }
-    mobile_data& operator=(mobile_data&&) {
+    auto operator=(mobile_data&&) -> mobile_data& {
         ADD_FAILURE();
         return *this;
     }
@@ -695,7 +698,7 @@ struct mobile_data {
 struct immobile_data : mobile_data {
     using mobile_data::mobile_data;
     immobile_data(const immobile_data&) = delete;
-    immobile_data& operator=(const immobile_data&) = delete;
+    auto operator=(const immobile_data&) -> immobile_data& = delete;
 };
 
 TEST(VariantTestReturnVisit, PerfectReturn) {
@@ -779,17 +782,17 @@ TEST(VariantTestVisit, VisitReference) {
     {
         using v = variant<float&, double&, int>;
         struct Visitor {
-            int operator()(float& arg) const {
+            auto operator()(float& arg) const -> int {
                 arg = 4.f;
                 return 1;
             }
 
-            int operator()(double& arg) const {
+            auto operator()(double& arg) const -> int {
                 arg = 5.0;
                 return 2;
             }
 
-            int operator()(int& arg) const {
+            auto operator()(int& arg) const -> int {
                 arg = 6;
                 return 3;
             }
@@ -829,6 +832,5 @@ TEST(VariantTestVisit, VisitReference) {
         );
     }
 }
-
 }  // namespace
 }  // namespace rust

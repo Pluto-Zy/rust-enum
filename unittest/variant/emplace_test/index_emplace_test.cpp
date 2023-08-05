@@ -282,7 +282,7 @@ TEST(VariantTestIndexEmplace, BasicBehavior) {
 
 #ifdef USE_CXX20
 template <std::size_t Index, class V, class Ty, class... Args>
-constexpr bool constexpr_emplace_impl(V&& v, Ty expected_value, Args&&... args) {
+constexpr auto constexpr_emplace_impl(V&& v, Ty expected_value, Args&&... args) -> bool {
     v.template emplace<Index>(std::forward<Args>(args)...);
     return v.index() == Index && get<Ty>(v) == expected_value;
 }
@@ -292,11 +292,11 @@ struct multiple_args {
     constexpr multiple_args(int x, int y, int z) noexcept : x(x), y(y), z(z) { }
 };
 
-constexpr bool operator==(const multiple_args& lhs, const multiple_args& rhs) {
+constexpr auto operator==(const multiple_args& lhs, const multiple_args& rhs) -> bool {
     return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
 }
 
-constexpr bool operator!=(const multiple_args& lhs, const multiple_args& rhs) {
+constexpr auto operator!=(const multiple_args& lhs, const multiple_args& rhs) -> bool {
     return !(lhs == rhs);
 }
 

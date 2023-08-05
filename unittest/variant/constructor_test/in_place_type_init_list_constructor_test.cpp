@@ -10,7 +10,8 @@ TEST(VariantTestInPlaceTypeInitListConstructor, Deleted) {
     static_assert(std::is_constructible<variant<list>, std::in_place_type_t<list>, list&>::value);
 
     static_assert(std::is_constructible<variant<list&>, std::in_place_type_t<list&>, list>::value);
-    static_assert(std::is_constructible<variant<list&>, std::in_place_type_t<list&>, list&>::value
+    static_assert(  //
+        std::is_constructible<variant<list&>, std::in_place_type_t<list&>, list&>::value
     );
 
     {
@@ -21,43 +22,57 @@ TEST(VariantTestInPlaceTypeInitListConstructor, Deleted) {
         {
             using v = variant<constructible_from_list>;
 
-            static_assert(
-                std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list>::
-                    value
+            static_assert(  //
+                std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list>::value
             );
-            static_assert(
-                std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list&>::
-                    value
+            static_assert(  //
+                std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list&>::value
             );
             static_assert(!std::is_constructible<v, std::in_place_type_t<list>, list>::value);
-            static_assert(!std::is_constructible<
-                          v,
-                          std::in_place_type_t<constructible_from_list>,
-                          std::initializer_list<double>>::value);
-            static_assert(
-                !std::
-                    is_constructible<v, std::in_place_type_t<constructible_from_list>, list, int>::
-                        value
+            static_assert(  //
+                !std::is_constructible<
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    std::initializer_list<double>>::value
+            );
+            static_assert(  //
+                !std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list,
+                    int>::value
             );
         }
         {
             using v = variant<int, constructible_from_list>;
 
-            static_assert(
-                std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list>::
-                    value
+            static_assert(  //
+                std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list>::value
             );
-            static_assert(
-                std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list&>::
-                    value
+            static_assert(  //
+                std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list&>::value
             );
             static_assert(!std::is_constructible<v, std::in_place_type_t<long>, list>::value);
         }
         {
             using v = variant<constructible_from_list, int, constructible_from_list>;
-            static_assert(
-                !std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list>::
-                    value
+            static_assert(  //
+                !std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list>::value
             );
             static_assert(std::is_constructible<v, std::in_place_type_t<int>, int>::value);
         }
@@ -70,26 +85,34 @@ TEST(VariantTestInPlaceTypeInitListConstructor, Deleted) {
         {
             using v = variant<constructible_from_list>;
 
-            static_assert(
-                std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list>::
-                    value
+            static_assert(  //
+                std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list>::value
             );
-            static_assert(
-                std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list&>::
-                    value
+            static_assert(  //
+                std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list&>::value
             );
             static_assert(!std::is_constructible<v, std::in_place_type_t<list>, list>::value);
         }
         {
             using v = variant<int, constructible_from_list>;
 
-            static_assert(
-                std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list>::
-                    value
+            static_assert(  //
+                std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list>::value
             );
-            static_assert(
-                std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list&>::
-                    value
+            static_assert(  //
+                std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list&>::value
             );
             static_assert(!std::is_constructible<v, std::in_place_type_t<int>, list>::value);
         }
@@ -102,26 +125,34 @@ TEST(VariantTestInPlaceTypeInitListConstructor, Deleted) {
         {
             using v = variant<constructible_from_list>;
 
-            static_assert(
-                std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list>::
-                    value
+            static_assert(  //
+                std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list>::value
             );
-            static_assert(
-                !std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list&>::
-                    value
+            static_assert(  //
+                !std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list&>::value
             );
             static_assert(!std::is_constructible<v, std::in_place_type_t<list>, list>::value);
         }
         {
             using v = variant<int, constructible_from_list>;
 
-            static_assert(
-                std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list>::
-                    value
+            static_assert(  //
+                std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list>::value
             );
-            static_assert(
-                !std::is_constructible<v, std::in_place_type_t<constructible_from_list>, list&>::
-                    value
+            static_assert(  //
+                !std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<constructible_from_list>,
+                    list&>::value
             );
             static_assert(!std::is_constructible<v, std::in_place_type_t<int>, list>::value);
         }
@@ -134,57 +165,73 @@ TEST(VariantTestInPlaceTypeInitListConstructor, Deleted) {
         {
             using v = variant<constructible_from_list_args>;
 
-            static_assert(std::is_constructible<
-                          v,
-                          std::in_place_type_t<constructible_from_list_args>,
-                          list,
-                          int>::value);
-            static_assert(std::is_constructible<
-                          v,
-                          std::in_place_type_t<constructible_from_list_args>,
-                          list,
-                          double>::value);
+            static_assert(  //
+                std::is_constructible<
+                    v,
+                    std::in_place_type_t<constructible_from_list_args>,
+                    list,
+                    int>::value
+            );
+            static_assert(  //
+                std::is_constructible<
+                    v,
+                    std::in_place_type_t<constructible_from_list_args>,
+                    list,
+                    double>::value
+            );
             static_assert(!std::is_constructible<v, std::in_place_type_t<list>, list, int>::value);
-            static_assert(!std::is_constructible<
-                          v,
-                          std::in_place_type_t<constructible_from_list_args>,
-                          list>::value);
-            static_assert(!std::is_constructible<
-                          v,
-                          std::in_place_type_t<constructible_from_list_args>,
-                          list,
-                          int,
-                          int>::value);
+            static_assert(  //
+                !std::is_constructible<
+                    v,
+                    std::in_place_type_t<constructible_from_list_args>,
+                    list>::value
+            );
+            static_assert(  //
+                !std::is_constructible<
+                    v,
+                    std::in_place_type_t<constructible_from_list_args>,
+                    list,
+                    int,
+                    int>::value
+            );
         }
         {
             using v = variant<int, constructible_from_list_args>;
 
-            static_assert(std::is_constructible<
-                          v,
-                          std::in_place_type_t<constructible_from_list_args>,
-                          list,
-                          int>::value);
-            static_assert(std::is_constructible<
-                          v,
-                          std::in_place_type_t<constructible_from_list_args>,
-                          list,
-                          double>::value);
+            static_assert(  //
+                std::is_constructible<
+                    v,
+                    std::in_place_type_t<constructible_from_list_args>,
+                    list,
+                    int>::value
+            );
+            static_assert(  //
+                std::is_constructible<
+                    v,
+                    std::in_place_type_t<constructible_from_list_args>,
+                    list,
+                    double>::value
+            );
             static_assert(!std::is_constructible<v, std::in_place_type_t<int>, list, int>::value);
-            static_assert(!std::is_constructible<
-                          v,
-                          std::in_place_type_t<constructible_from_list_args>,
-                          list>::value);
+            static_assert(  //
+                !std::is_constructible<
+                    v,
+                    std::in_place_type_t<constructible_from_list_args>,
+                    list>::value
+            );
             static_assert(
                 !std::is_constructible<v, std::in_place_index_t<1>, list, int, int>::value
             );
         }
         {
             using v = variant<constructible_from_list_args, int, constructible_from_list_args>;
-            static_assert(!std::is_constructible<
-                          v,
-                          std::in_place_type_t<constructible_from_list_args>,
-                          list,
-                          int>::value);
+            static_assert(  //
+                !std::is_constructible<
+                    v,
+                    std::in_place_type_t<constructible_from_list_args>,
+                    list,
+                    int>::value
+            );
             static_assert(std::is_constructible<v, std::in_place_type_t<int>, int>::value);
         }
     }
@@ -201,21 +248,27 @@ TEST(VariantTestInPlaceTypeInitListConstructor, Noexcept) {
         {
             using v = variant<may_throw_constructible>;
 
-            static_assert(!std::is_nothrow_constructible<
-                          v,
-                          std::in_place_type_t<may_throw_constructible>,
-                          list,
-                          int>::value);
-            static_assert(
-                std::
-                    is_constructible<v, std::in_place_type_t<may_throw_constructible>, list, int>::
-                        value
+            static_assert(  //
+                !std::is_nothrow_constructible<
+                    v,
+                    std::in_place_type_t<may_throw_constructible>,
+                    list,
+                    int>::value
             );
-            static_assert(std::is_nothrow_constructible<
-                          v,
-                          std::in_place_type_t<may_throw_constructible>,
-                          list,
-                          double>::value);
+            static_assert(  //
+                std::is_constructible<  //
+                    v,
+                    std::in_place_type_t<may_throw_constructible>,
+                    list,
+                    int>::value
+            );
+            static_assert(  //
+                std::is_nothrow_constructible<
+                    v,
+                    std::in_place_type_t<may_throw_constructible>,
+                    list,
+                    double>::value
+            );
         }
     }
 }
@@ -259,8 +312,11 @@ TEST(VariantTestInPlaceTypeInitListConstructor, BasicBehavior) {
             static_assert(get<constructible_from_init_list>(x).list_size == 3);
         }
         {
-            constexpr v
-                x(std::in_place_type<constructible_from_init_list_with_arg>, { 1, 2, 3 }, 4);
+            constexpr v x(  //
+                std::in_place_type<constructible_from_init_list_with_arg>,
+                { 1, 2, 3 },
+                4
+            );
             static_assert(x.index() == 1);
             static_assert(get<1>(x).list_size == 3);
             static_assert(get<1>(x).value == 4);

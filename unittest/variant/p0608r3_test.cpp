@@ -221,12 +221,15 @@ struct default_struct { };
 TEST(VariantTestP0608R3, MoreCases) {
     // More cases from MSVC STL.
     static_assert(std::is_constructible<variant<double_double>, double>::value);
-    static_assert(std::is_constructible<
-                  variant<std::vector<std::vector<int>>, std::optional<int>, int>,
-                  int>::value);
-    static_assert(
-        std::is_constructible<variant<std::vector<std::vector<int>>, std::optional<int>>, int>::
-            value
+    static_assert(  //
+        std::is_constructible<
+            variant<std::vector<std::vector<int>>, std::optional<int>, int>,
+            int>::value
+    );
+    static_assert(  //
+        std::is_constructible<  //
+            variant<std::vector<std::vector<int>>, std::optional<int>>,
+            int>::value
     );
     static_assert(
         std::is_constructible<variant<std::vector<int>, std::optional<int>, float>, int>::value
@@ -245,9 +248,10 @@ TEST(VariantTestP0608R3, MoreCases) {
     static_assert(!std::is_constructible<variant<float, long, long long>, int>::value);
 
     static_assert(std::is_assignable<variant<double_double>, double>::value);
-    static_assert(
-        std::is_assignable<variant<std::vector<std::vector<int>>, std::optional<int>, int>, int>::
-            value
+    static_assert(  //
+        std::is_assignable<  //
+            variant<std::vector<std::vector<int>>, std::optional<int>, int>,
+            int>::value
     );
     static_assert(
         std::is_assignable<variant<std::vector<std::vector<int>>, std::optional<int>>, int>::value

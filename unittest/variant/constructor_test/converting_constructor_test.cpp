@@ -120,7 +120,7 @@ TEST(VariantTestConvertingConstructor, Noexcept) {
     {
         struct nothrow {
             nothrow(int) noexcept { }
-            nothrow& operator=(int) noexcept {
+            auto operator=(int) noexcept -> nothrow& {
                 return *this;
             }
         };
@@ -129,7 +129,7 @@ TEST(VariantTestConvertingConstructor, Noexcept) {
     {
         struct throws_constructor {
             throws_constructor(int) noexcept(false) { }
-            throws_constructor& operator=(int) noexcept {
+            auto operator=(int) noexcept -> throws_constructor& {
                 return *this;
             }
         };
@@ -140,11 +140,12 @@ TEST(VariantTestConvertingConstructor, Noexcept) {
     {
         struct throws_assignment {
             throws_assignment(int) noexcept { }
-            throws_assignment& operator=(int) noexcept(false) {
+            auto operator=(int) noexcept(false) -> throws_assignment& {
                 return *this;
             }
         };
-        static_assert(std::is_nothrow_constructible<variant<dummy, throws_assignment>, int>::value
+        static_assert(  //
+            std::is_nothrow_constructible<variant<dummy, throws_assignment>, int>::value
         );
     }
     {

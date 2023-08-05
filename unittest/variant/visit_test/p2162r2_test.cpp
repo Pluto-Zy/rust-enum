@@ -25,16 +25,16 @@ struct expr : variant<int, neg, add, mul> {
 
 int eval(const expr& expr) {
     struct visitor {
-        int operator()(int i) const {
+        auto operator()(int i) const -> int {
             return i;
         }
-        int operator()(const neg& n) const {
+        auto operator()(const neg& n) const -> int {
             return -eval(*n.e);
         }
-        int operator()(const add& a) const {
+        auto operator()(const add& a) const -> int {
             return eval(*a.lhs) + eval(*a.rhs);
         }
-        int operator()(const mul& m) const {
+        auto operator()(const mul& m) const -> int {
             return eval(*m.lhs) * eval(*m.rhs);
         }
     };
@@ -69,10 +69,13 @@ TEST(VariantTestP2162R2, P2162R2) {
         visit([](auto x) { EXPECT_EQ(x.val, 'd'); }, std::move(v2));
     }
     {
-        const expr e = add { std::make_shared<expr>(1),
-                             std::make_shared<expr>(mul {
-                                 std::make_shared<expr>(2),
-                                 std::make_shared<expr>(neg { std::make_shared<expr>(3) }) }) };
+        const expr e = add {
+            std::make_shared<expr>(1),
+            std::make_shared<expr>(mul {
+                std::make_shared<expr>(2),
+                std::make_shared<expr>(neg { std::make_shared<expr>(3) }),
+            }),
+        };
 
         EXPECT_EQ(eval(e), 1 + 2 * -3);
     }

@@ -13,40 +13,40 @@ struct valueless_t {
     valueless_t(valueless_t&&) {
         throw 2;
     }
-    valueless_t& operator=(const valueless_t&) {
+    auto operator=(const valueless_t&) -> valueless_t& {
         throw 3;
     }
-    valueless_t& operator=(valueless_t&&) {
+    auto operator=(valueless_t&&) -> valueless_t& {
         throw 4;
     }
 };
 
-inline bool operator==(const valueless_t&, const valueless_t&) {
+inline auto operator==(const valueless_t&, const valueless_t&) -> bool {
     ADD_FAILURE();
     return false;
 }
 
-inline bool operator!=(const valueless_t&, const valueless_t&) {
+inline auto operator!=(const valueless_t&, const valueless_t&) -> bool {
     ADD_FAILURE();
     return false;
 }
 
-inline bool operator<(const valueless_t&, const valueless_t&) {
+inline auto operator<(const valueless_t&, const valueless_t&) -> bool {
     ADD_FAILURE();
     return false;
 }
 
-inline bool operator<=(const valueless_t&, const valueless_t&) {
+inline auto operator<=(const valueless_t&, const valueless_t&) -> bool {
     ADD_FAILURE();
     return false;
 }
 
-inline bool operator>(const valueless_t&, const valueless_t&) {
+inline auto operator>(const valueless_t&, const valueless_t&) -> bool {
     ADD_FAILURE();
     return false;
 }
 
-inline bool operator>=(const valueless_t&, const valueless_t&) {
+inline auto operator>=(const valueless_t&, const valueless_t&) -> bool {
     ADD_FAILURE();
     return false;
 }
@@ -71,11 +71,11 @@ struct counter {
     counter(counter&&) : counter() {
         ++move_construct_count;
     }
-    counter& operator=(const counter&) {
+    auto operator=(const counter&) -> counter& {
         ++copy_assign_count;
         return *this;
     }
-    counter& operator=(counter&&) {
+    auto operator=(counter&&) -> counter& {
         ++move_assign_count;
         return *this;
     }

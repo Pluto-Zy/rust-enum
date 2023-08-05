@@ -15,7 +15,7 @@ enum call_type : unsigned {
     CT_RVALUE = 8,
 };
 
-constexpr call_type operator|(call_type lhs, call_type rhs) {
+constexpr auto operator|(call_type lhs, call_type rhs) -> call_type {
     return static_cast<call_type>(static_cast<unsigned>(lhs) | static_cast<unsigned>(rhs));
 }
 
@@ -23,25 +23,25 @@ struct forwarding_call_object {
     using self = forwarding_call_object;
 
     template <class... Args>
-    self& operator()(Args&&...) & {
+    auto operator()(Args&&...) & -> self& {
         set_call<Args&&...>(CT_NON_CONST | CT_LVALUE);
         return *this;
     }
 
     template <class... Args>
-    const self& operator()(Args&&...) const& {
+    auto operator()(Args&&...) const& -> const self& {
         set_call<Args&&...>(CT_CONST | CT_LVALUE);
         return *this;
     }
 
     template <class... Args>
-    self&& operator()(Args&&...) && {
+    auto operator()(Args&&...) && -> self&& {
         set_call<Args&&...>(CT_NON_CONST | CT_RVALUE);
         return std::move(*this);
     }
 
     template <class... Args>
-    const self&& operator()(Args&&...) const&& {
+    auto operator()(Args&&...) const&& -> const self&& {
         set_call<Args&&...>(CT_CONST | CT_RVALUE);
         return std::move(*this);
     }
@@ -55,7 +55,7 @@ struct forwarding_call_object {
     }
 
     template <class... Args>
-    static bool check_call(call_type type) {
+    static auto check_call(call_type type) -> bool {
         std::type_index expected[] = { std::type_index(typeid(int)),
                                        std::type_index(typeid(Args))... };
         bool const result = last_call_type == type
@@ -80,7 +80,7 @@ struct forwarding_call_object {
 
 struct return_first {
     template <class... Args>
-    constexpr int operator()(int val, Args&&...) const {
+    constexpr auto operator()(int val, Args&&...) const -> int {
         return val;
     }
 };
@@ -100,14 +100,14 @@ struct return_first_reference {
     // which show that the behavior of MSVC may be incorrect. We can also find
     // that GCC and Clang both have the correct behavior.
     template <class... Args>
-    constexpr int* operator()(int& ref, Args&&...) const {
+    constexpr auto operator()(int& ref, Args&&...) const -> int* {
         return &ref;
     }
 };
 
 struct return_arity {
     template <class... Args>
-    constexpr unsigned operator()(Args&&...) const {
+    constexpr auto operator()(Args&&...) const -> unsigned {
         return static_cast<unsigned>(sizeof...(Args));
     }
 };
@@ -122,17 +122,17 @@ struct mobile_visitor {
     mobile_visitor(mobile_visitor&&) {
         ADD_FAILURE();
     }
-    mobile_visitor& operator=(const mobile_visitor&) {
+    auto operator=(const mobile_visitor&) -> mobile_visitor& {
         ADD_FAILURE();
         return *this;
     }
-    mobile_visitor& operator=(mobile_visitor&&) {
+    auto operator=(mobile_visitor&&) -> mobile_visitor& {
         ADD_FAILURE();
         return *this;
     }
 
     template <class... Args>
-    constexpr decltype(auto) operator()(Args&&... args) const {
+    constexpr auto operator()(Args&&... args) const -> decltype(auto) {
         return Fn {}(std::forward<Args>(args)...);
     }
 };
@@ -141,7 +141,7 @@ template <class Fn>
 struct immobile_visitor : mobile_visitor<Fn> {
     immobile_visitor() = default;
     immobile_visitor(const immobile_visitor&) = delete;
-    immobile_visitor& operator=(const immobile_visitor&) = delete;
+    auto operator=(const immobile_visitor&) -> immobile_visitor& = delete;
 };
 }  // namespace rust
 

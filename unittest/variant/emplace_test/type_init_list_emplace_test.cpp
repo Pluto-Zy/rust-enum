@@ -14,10 +14,12 @@ TEST(VariantTestTypeInitListEmplace, Deleted) {
     static_assert(
         !has_type_emplace<variant<list, std::initializer_list<double>, list>, list, list>::value
     );
-    static_assert(has_type_emplace<
-                  variant<list, std::initializer_list<double>, list>,
-                  std::initializer_list<double>,
-                  std::initializer_list<double>>::value);
+    static_assert(  //
+        has_type_emplace<
+            variant<list, std::initializer_list<double>, list>,
+            std::initializer_list<double>,
+            std::initializer_list<double>>::value
+    );
 
     static_assert(has_type_emplace<variant<list&>, list&, list>::value);
     static_assert(has_type_emplace<variant<list&>, list&, list&>::value);
@@ -91,7 +93,8 @@ TEST(VariantTestTypeInitListEmplace, Deleted) {
             static_assert(has_type_emplace<v, constructible_from_list_args, list, int>::value);
             static_assert(has_type_emplace<v, constructible_from_list_args, list, double>::value);
             static_assert(!has_type_emplace<v, constructible_from_list_args, list>::value);
-            static_assert(!has_type_emplace<v, constructible_from_list_args, list, int, int>::value
+            static_assert(  //
+                !has_type_emplace<v, constructible_from_list_args, list, int, int>::value
             );
         }
         {
@@ -100,7 +103,8 @@ TEST(VariantTestTypeInitListEmplace, Deleted) {
             static_assert(has_type_emplace<v, constructible_from_list_args, list, int>::value);
             static_assert(has_type_emplace<v, constructible_from_list_args, list, double>::value);
             static_assert(!has_type_emplace<v, constructible_from_list_args, list>::value);
-            static_assert(!has_type_emplace<v, constructible_from_list_args, list, int, int>::value
+            static_assert(  //
+                !has_type_emplace<v, constructible_from_list_args, list, int, int>::value
             );
         }
     }

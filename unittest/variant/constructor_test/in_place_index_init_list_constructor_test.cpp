@@ -23,10 +23,12 @@ TEST(VariantTestInPlaceIndexInitListConstructor, Deleted) {
             static_assert(std::is_constructible<v, std::in_place_index_t<0>, list>::value);
             static_assert(std::is_constructible<v, std::in_place_index_t<0>, list&>::value);
             static_assert(!std::is_constructible<v, std::in_place_index_t<1>, list>::value);
-            static_assert(!std::is_constructible<
-                          v,
-                          std::in_place_index_t<0>,
-                          std::initializer_list<double>>::value);
+            static_assert(  //
+                !std::is_constructible<
+                    v,
+                    std::in_place_index_t<0>,
+                    std::initializer_list<double>>::value
+            );
             static_assert(!std::is_constructible<v, std::in_place_index_t<0>, list, int>::value);
         }
         {

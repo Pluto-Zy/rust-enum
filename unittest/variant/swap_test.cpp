@@ -91,12 +91,12 @@ struct nothrow_type_impl {
         other.value = -1;
     }
 
-    nothrow_type_impl& operator=(const nothrow_type_impl&) noexcept(NTCopyAssign) {
+    auto operator=(const nothrow_type_impl&) noexcept(NTCopyAssign) -> nothrow_type_impl& {
         ADD_FAILURE();
         return *this;
     }
 
-    nothrow_type_impl& operator=(nothrow_type_impl&& other) noexcept(NTMoveAssign) {
+    auto operator=(nothrow_type_impl&& other) noexcept(NTMoveAssign) -> nothrow_type_impl& {
         ++move_assign_called;
         do_throw<!NTMoveAssign>();
         value = other.value;
@@ -275,7 +275,8 @@ struct non_throwing_non_noexcept_type {
         other.value = -1;
     }
 
-    non_throwing_non_noexcept_type& operator=(non_throwing_non_noexcept_type&&) noexcept(false) {
+    auto operator=(non_throwing_non_noexcept_type&&) noexcept(false)
+        -> non_throwing_non_noexcept_type& {
         ADD_FAILURE();
         return *this;
     }
@@ -292,7 +293,7 @@ struct throws_on_second_move {
             do_throw<true>();
         other.value = -1;
     }
-    throws_on_second_move& operator=(throws_on_second_move&&) {
+    auto operator=(throws_on_second_move&&) -> throws_on_second_move& {
         ADD_FAILURE();
         return *this;
     }
