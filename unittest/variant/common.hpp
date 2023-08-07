@@ -51,6 +51,13 @@ inline auto operator>=(const valueless_t&, const valueless_t&) -> bool {
     return false;
 }
 
+#ifdef USE_CXX20
+inline auto operator<=>(const valueless_t&, const valueless_t&) -> std::weak_ordering {
+    ADD_FAILURE();
+    return std::weak_ordering::equivalent;
+}
+#endif
+
 template <class Variant>
 void make_valueless(Variant& v) {
     Variant valueless(std::in_place_type<valueless_t>);
