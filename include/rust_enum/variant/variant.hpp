@@ -17,8 +17,6 @@ template <class... Tys>
 class variant :
     private detail::variant_move_assignment_storage_t<
         detail::variant_alternative_storage<Tys>...> {
-    using self = variant;
-
     static_assert(
         std::conjunction<
             typename detail::variant_alternative_storage<Tys>::is_destructible...>::value,
@@ -33,6 +31,7 @@ class variant :
     );
     static_assert(sizeof...(Tys) > 0, "Cannot construct empty variant.");
 
+    using self = variant;
     using base =
         detail::variant_move_assignment_storage_t<detail::variant_alternative_storage<Tys>...>;
 
@@ -64,8 +63,10 @@ public:
                 typename detail::conv_ctor_index<Ty, Tys...>::storage_type::
                     template is_constructible<Ty>>::value,
             int>::type = 0>
-    CONSTEXPR17 variant(Ty&& other) noexcept(detail::conv_ctor_index<Ty, Tys...>::storage_type::
-                                                 template is_nothrow_constructible<Ty>::value) :
+    CONSTEXPR17 variant(Ty&& other) noexcept(  //
+        detail::conv_ctor_index<Ty, Tys...>::storage_type::template is_nothrow_constructible<
+            Ty>::value
+    ) :
         base(
             std::in_place_index<detail::conv_ctor_index<Ty, Tys...>::index>,
             std::forward<Ty>(other)
@@ -99,8 +100,10 @@ public:
         std::in_place_type_t<Ty>,
         std::initializer_list<U> list,
         Args&&... args
-    ) noexcept(detail::variant_alternative_storage<Ty>::
-                   template is_nothrow_constructible<std::initializer_list<U>&, Args...>::value) :
+    ) noexcept(  //
+        detail::variant_alternative_storage<
+            Ty>::template is_nothrow_constructible<std::initializer_list<U>&, Args...>::value
+    ) :
         base(std::in_place_index<MatchIndex>, list, std::forward<Args>(args)...) { }
 
     template <
@@ -145,10 +148,10 @@ public:
                 typename Selected::storage_type::template is_assignable<Ty>,
                 typename Selected::storage_type::template is_constructible<Ty>>::value,
             int>::type = 0>
-    CONSTEXPR17 auto operator=(Ty&& other
-    ) noexcept(Selected::storage_type::template is_nothrow_assignable<Ty>::value&&
-                   Selected::storage_type::template is_nothrow_constructible<Ty>::value)
-        -> variant& {
+    CONSTEXPR17 auto operator=(Ty&& other) noexcept(
+        Selected::storage_type::template is_nothrow_assignable<Ty>::value
+        && Selected::storage_type::template is_nothrow_constructible<Ty>::value
+    ) -> variant& {
         detail::tagged_visit(
             detail::variant_assign_visitor_impl<
                 Selected::index,
