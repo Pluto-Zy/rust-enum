@@ -148,8 +148,8 @@ public:
                 typename Selected::storage_type::template is_assignable<Ty>,
                 typename Selected::storage_type::template is_constructible<Ty>>::value,
             int>::type = 0>
-    CONSTEXPR17 auto operator=(Ty&& other) noexcept(
-        Selected::storage_type::template is_nothrow_assignable<Ty>::value
+    CONSTEXPR17 auto operator=(Ty&& other) noexcept(  //
+        (Selected::storage_type::template is_nothrow_assignable<Ty>::value)
         && Selected::storage_type::template is_nothrow_constructible<Ty>::value
     ) -> variant& {
         detail::tagged_visit(
