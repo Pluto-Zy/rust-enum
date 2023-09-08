@@ -17,3 +17,4 @@ function (rust_enum_add_unittest name)
 endfunction(rust_enum_add_unittest)
 
 add_subdirectory(variant)
+add_subdirectory(tuple)
