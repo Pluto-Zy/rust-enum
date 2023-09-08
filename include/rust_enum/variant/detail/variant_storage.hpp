@@ -104,8 +104,11 @@ struct variant_storage {
     CONSTEXPR20 void construct_union_alt(Args&&... args) noexcept(
         std::is_nothrow_constructible<storage_t, std::in_place_index_t<Idx>, Args&&...>::value
     ) {
-        (construct_at
-        )(std::addressof(_value_storage), std::in_place_index<Idx>, std::forward<Args>(args)...);
+        (construct_at)(
+            std::addressof(_value_storage),
+            std::in_place_index<Idx>,
+            std::forward<Args>(args)...
+        );
         set_index(Idx);
     }
 

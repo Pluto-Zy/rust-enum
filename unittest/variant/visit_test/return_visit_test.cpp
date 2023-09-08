@@ -823,13 +823,7 @@ TEST(VariantTestVisit, VisitReference) {
         using v = variant<int&, double&>;
         int data = 3;
         v x(data);
-        EXPECT_EQ(
-            rust::visit<void*>(
-                [](auto& ref) -> auto{ return &ref; },
-                x
-            ),
-            &data
-        );
+        EXPECT_EQ(rust::visit<void*>([](auto& ref) -> auto { return &ref; }, x), &data);
     }
 }
 }  // namespace
