@@ -32,6 +32,11 @@ TEST(VariantTestMonostate, Compare) {
         static_assert(noexcept(m1 > m2));
         static_assert(noexcept(m1 <= m2));
         static_assert(noexcept(m1 >= m2));
+
+#ifdef USE_CXX20
+        static_assert(std::is_same<decltype(m1 <=> m2), std::strong_ordering>::value);
+        static_assert(noexcept(m1 <=> m2));
+#endif
     }
 
     // non-constexpr
@@ -51,6 +56,11 @@ TEST(VariantTestMonostate, Compare) {
         static_assert(noexcept(m1 > m2));
         static_assert(noexcept(m1 <= m2));
         static_assert(noexcept(m1 >= m2));
+
+#ifdef USE_CXX20
+        static_assert(std::is_same<decltype(m1 <=> m2), std::strong_ordering>::value);
+        static_assert(noexcept(m1 <=> m2));
+#endif
     }
 }
 }  // namespace

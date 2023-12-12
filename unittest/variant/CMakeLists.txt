@@ -8,6 +8,7 @@ rust_enum_add_unittest(variant_test
             get_test.cpp
             holds_alternative_test.cpp
             comparison_test.cpp
+            comparison_three_way_test.cpp
             assignment_test/converting_assignment_test.cpp
             assignment_test/copy_assignment_test.cpp
             assignment_test/move_assignment_test.cpp
